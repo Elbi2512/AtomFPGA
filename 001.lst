@@ -1,0 +1,2036 @@
+ca65 V2.13.3 - (C) Copyright 1998-2012 Ullrich von Bassewitz
+Main file   : 001.asm
+Current file: 001.asm
+
+000000r 1               ;
+000000r 1               ;  (c) Copyright 1998, 1998   BinGate Automation
+000000r 1               ;  Version 0.01 (Apr 13 1998)
+000000r 1               ;	updates 1.0 17 nov 2019
+000000r 1               ;
+000000r 1               ; File: fp100.asm
+000000r 1               ;       Date:   Mon Jan 26 15:59:04 1998
+000000r 1               ;       CPU:    MOS Technology 6502
+000000r 1               ;
+000000r 1               .P02	; good old 6502
+000000r 1               ; writeFPRL
+000000r 1               
+000000r 1               FPROC      :=      0
+000000r 1               FPADD      :=      1
+000000r 1               FPSUB      :=      2
+000000r 1               FPMUL      :=      3
+000000r 1               FPDIV      :=      4
+000000r 1               FPABS      :=      5
+000000r 1               FPRNDINT   :=      6
+000000r 1               FPSQRT     :=      7
+000000r 1               FPTAN      :=      8
+000000r 1               FPSIN      :=      9
+000000r 1               FPCOS      :=      10
+000000r 1               FPDEG      :=      11
+000000r 1               FPRAD      :=      12
+000000r 1               FPOWER     :=      13
+000000r 1               FPHTN      :=      14
+000000r 1               FPLN       :=      15
+000000r 1               FPLOG      :=      16
+000000r 1               FPYTOX     :=      17
+000000r 1               FPEXP      :=      18
+000000r 1               FPTENTOX   :=      19
+000000r 1               FPACOT     :=      20
+000000r 1               FPACS      :=      21
+000000r 1               FPASN      :=      22
+000000r 1               FPSEC      :=      23
+000000r 1               FPCSC      :=      24
+000000r 1               FPATN      :=      25
+000000r 1               FPTWOTOX   :=      26
+000000r 1               FPATHH     :=      27
+000000r 1               FPCOMP     :=      28
+000000r 1               ; hooks to other roms
+000000r 1               
+000000r 1               
+000000r 1               L1002   :=     $1002
+000000r 1               LA002   :=     $A002
+000000r 1               LC231   :=     $C231
+000000r 1               LC278   :=     $C278
+000000r 1               LC279   :=     $C279
+000000r 1               LC3CB   :=     $C3CB
+000000r 1               LC372   :=     $C372
+000000r 1               LC3CD   :=     $C3CD
+000000r 1               LC434   :=     $C434
+000000r 1               LC4D9   :=     $C4D9
+000000r 1               LC4E1   :=     $C4E1
+000000r 1               LC4E4   :=     $C4E4
+000000r 1               LC54A   :=     $C54A
+000000r 1               LC558   :=     $C558
+000000r 1               LC55B   :=     $C55B
+000000r 1               LC569   :=     $C569
+000000r 1               LC78B   :=     $C78B
+000000r 1               LC8BC   :=     $C8BC
+000000r 1               LC99F   :=     $C99F
+000000r 1               LCA1B   :=     $CA1B
+000000r 1               LCA4C   :=     $CA4C
+000000r 1               LCB29   :=     $CB29
+000000r 1               LCCD5   :=     $CCD5
+000000r 1               LCD09   :=     $CD09
+000000r 1               LCEB1   :=     $CEB1
+000000r 1               LCF3E   :=     $CF3E
+000000r 1               LCF41   :=     $CF41
+000000r 1               ;D6C3 Copy the 8 bytes #57..#5E to #5F..66 subroutine
+000000r 1               ;D6CD Shift Left 1 Bit #5E..#5A subroutine
+000000r 1               ;D6D8 Shift Right 1 Bit #5A..#5E subroutine
+000000r 1               ;D6E3 Copy #5A..#5D to #5B..#5E and clear #5A subroutine
+000000r 1               ;D706 Copy #62..#65 to #63..#66 and clear #62 subroutine
+000000r 1               LEE7C   :=     $EE7C
+000000r 1               LF802   :=     $F802
+000000r 1               LFFD1   :=     $FFD1
+000000r 1               LFFC5   :=     $FFC5
+000000r 1               LFFC8   :=     $FFC8
+000000r 1               LFFD4   :=     $FFD4
+000000r 1               
+000000r 1               ;D0E4 Deal with '('
+000000r 1               ;D0EB Deal with '+' and '-'
+000000r 1               ;D0F2 Deal with '*' and '/'
+000000r 1               ;D0FC Deal with '+' and '-'
+000000r 1               ;D103 Deal with '^'
+000000r 1               ;D10E Floating Point interpreter
+000000r 1               ;D15E Floating Point interpreter
+000000r 1               ;D177 Deals with '+'
+000000r 1               ;D183 Deals with '-'
+000000r 1               ;D18F Deals with '*'
+000000r 1               ;D19B Deals with '/'
+000000r 1               ;D1A7 Deals with '^'
+000000r 1               ;D1BC Deals with '-'
+000000r 1               ;D1CB Deals with '+'
+000000r 1               ;
+000000r 1                .org $D000
+00D000  1               ; .byte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 ; 16 dummy's
+00D000  1  AA            .byte $AA
+00D001  1  55            .byte $55
+00D002  1  0E D1         .byte $0E, $d1
+00D004  1  5E D1         .byte $5e, $d1
+00D006  1               XD006:
+00D006  1  28            .byte '('
+00D007  1  D0            .byte INIT1/256
+00D008  1  E4            .byte INIT1 .MOD 256
+00D009  1  41 43 53      .byte    "ACS"
+00D00C  1  D2            .byte ACS/256
+00D00D  1  54            .byte ACS .MOD 256
+00D00E  1  41 53 4E      .byte    "ASN"
+00D011  1  D2            .byte ASN/256
+00D012  1  5F            .byte ASN .MOD 256
+00D013  1  41 54 4E      .byte    "ATN"
+00D016  1  DB            .byte ATN/256
+00D017  1  29            .byte ATN .MOD 256
+00D018  1  41 42 53      .byte    "ABS"
+00D01B  1  D2            .byte ABS/256
+00D01C  1  4B            .byte ABS .MOD 256
+00D01D  1  43 4F 53      .byte    "COS"
+00D020  1  DB            .byte COS/256
+00D021  1  3A            .byte COS .MOD 256
+00D022  1                ;.byte     "FPINIT"
+00D022  1                ;.byte    FPINIT/256
+00D022  1                ;.byte    FPINIT .MOD 256
+00D022  1  45 58 50      .byte    "EXP"
+00D025  1  DB            .byte EXP/256
+00D026  1  50            .byte EXP .MOD 256
+00D027  1  48 54 4E      .byte    "HTN"
+00D02A  1  DB            .byte HTN/256
+00D02B  1  73            .byte HTN .MOD 256
+00D02C  1  4C 4F 47      .byte    "LOG"
+00D02F  1  DB            .byte LOG/256
+00D030  1  16            .byte LOG .MOD 256
+00D031  1  50 49         .byte    "PI"
+00D033  1  D2            .byte PI/256
+00D034  1  BD            .byte PI .MOD 256
+00D035  1  53 49 4E      .byte    "SIN"
+00D038  1  DB            .byte SIN/256
+00D039  1  45            .byte SIN .MOD 256
+00D03A  1  53 51 52      .byte "SQR"
+00D03D  1  DA            .byte SQR/256
+00D03E  1  ED            .byte SQR .MOD 256
+00D03F  1  54 41 4E      .byte    "TAN"
+00D042  1  DA            .byte TAN/256
+00D043  1  88            .byte TAN .MOD 256
+00D044  1  44 45 47      .byte    "DEG"
+00D047  1  D2            .byte DEG/256
+00D048  1  75            .byte DEG .MOD 256
+00D049  1  52 41 44      .byte    "RAD"
+00D04C  1  D2            .byte RAD/256
+00D04D  1  6A            .byte RAD .MOD 256
+00D04E  1  53 47 4E      .byte "SGN"
+00D051  1  D2             .byte SGN/256
+00D052  1  80            .byte SGN .MOD 256
+00D053  1  56 41 4C      .byte    "VAL"
+00D056  1  D2            .byte VAL/256
+00D057  1  E7            .byte VAL .MOD 256
+00D058  1  46 4C 54      .byte "FLT"
+00D05B  1  D2            .byte FLT/256
+00D05C  1  94            .byte FLT .MOD 256
+00D05D  1  46 47 45 54   .byte    "FGET"
+00D061  1  DB            .byte FPINIT/256
+00D062  1  8B            .byte FPINIT .MOD 256
+00D063  1  D2            .byte PER1/256
+00D064  1  90            .byte PER1 .MOD 256
+00D065  1  25            .byte    "%"
+00D066  1  D3            .byte VAR/256
+00D067  1  12            .byte VAR .MOD 256
+00D068  1  46 49 46      .byte "FIF"
+00D06B  1  D3            .byte FIF/256
+00D06C  1  AF            .byte FIF .MOD 256
+00D06D  1  46 55 4E 54   .byte    "FUNTIL"
+00D071  1  49 4C        
+00D073  1  D3            .byte FUNTIL/256
+00D074  1  B5            .byte FUNTIL .MOD 256
+00D075  1  43 4F 4C 4F   .byte "COLOUR"
+00D079  1  55 52        
+00D07B  1  EE            .byte LEE7C/256
+00D07C  1  7C            .byte LEE7C .MOD 256
+00D07D  1  46 44 49 4D   .byte "FDIM"
+00D081  1  D3            .byte FDIM/256
+00D082  1  DA            .byte FDIM .MOD 256
+00D083  1  53 54 52      .byte "STR"
+00D086  1  D3            .byte STR/256
+00D087  1  26            .byte STR .MOD 256
+00D088  1  46 50 52 49   .byte "FPRINT"
+00D08C  1  4E 54        
+00D08E  1  D3            .byte FPRINT/256
+00D08F  1  38            .byte FPRINT .MOD 256
+00D090  1  46 49 4E 50   .byte "FINPUT"
+00D094  1  55 54        
+00D096  1  D3            .byte FINPUT/256
+00D097  1  71            .byte FINPUT .MOD 256
+00D098  1  46 50 55 54   .byte "FPUT"
+00D09C  1  D3            .byte FPUT/256
+00D09D  1  BB            .byte FPUT .MOD 256
+00D09E  1  D4            .byte OTHERROM/256
+00D09F  1  B6            .byte OTHERROM .MOD 256
+00D0A0  1  2B            .byte "+"
+00D0A1  1  D1            .byte FP_PLS/256
+00D0A2  1  77            .byte FP_PLS .MOD 256
+00D0A3  1  2D            .byte "-"
+00D0A4  1  D1            .byte FP_MIN/256
+00D0A5  1  8E            .byte FP_MIN .MOD 256
+00D0A6  1  FE            .byte $FE
+00D0A7  1  2A            .byte "*"
+00D0A8  1  D1            .byte FP_MAAL/256
+00D0A9  1  A5            .byte FP_MAAL .MOD 256
+00D0AA  1  2F            .byte "/"
+00D0AB  1  D1            .byte FP_DIV/256
+00D0AC  1  BC            .byte FP_DIV .MOD 256
+00D0AD  1  FE            .byte $FE
+00D0AE  1  5E            .byte "^"
+00D0AF  1  D1            .byte FP_MACH/256
+00D0B0  1  D3            .byte FP_MACH .MOD 256
+00D0B1  1  FE            .byte $FE
+00D0B2  1  2B            .byte "+"
+00D0B3  1  D2            .byte FPL_pl/256
+00D0B4  1  01            .byte FPL_pl .MOD 256
+00D0B5  1  2D            .byte "-"
+00D0B6  1  D1            .byte FPL_min/256
+00D0B7  1  F2            .byte FPL_min .MOD 256
+00D0B8  1  D2            .byte FPL_pl/256
+00D0B9  1  01            .byte FPL_pl .MOD 256
+00D0BA  1  29            .byte ")"
+00D0BB  1  C2            .byte LC278/256
+00D0BC  1  78            .byte LC278 .MOD 256
+00D0BD  1  FF            .byte $FF
+00D0BE  1  3B C5 4A      .byte ';', LC54A/256, LC54A .MOD 256
+00D0C1  1  0D C5 4A      .byte $0d, LC54A/256, LC54A .MOD 256
+00D0C4  1  2C D3 38      .byte ',', FPRINT/256, FPRINT .MOD 256
+00D0C7  1  D3 40         .byte LD339/256, LD339 .MOD 256
+00D0C9  1  2C D3 71 C5   .byte ',', FINPUT/256, FINPUT .MOD 256, LC558/256, LC558 .MOD 256
+00D0CD  1  58           
+00D0CE  1  3D D9 CB      .byte '=', EQUAL/256, EQUAL .MOD 256
+00D0D1  1  3C 3E D9 D9  .byte "<>", NEQUAL/256, NEQUAL .MOD 256
+00D0D5  1  3C 3D D9 D2  .byte "<=", LEQUAL/256, LEQUAL .MOD 256
+00D0D9  1  3C D9 E0     .byte '<', LT/256, LT .MOD 256
+00D0DC  1  3E 3D D9 E7  .byte ">=", GEQUAL / 256, GEQUAL .MOD 256
+00D0E0  1  3E D9 EE FF   .byte '>', GT/256, GT .MOD 256, $FF
+00D0E4  1               ;
+00D0E4  1               ;D0E4 Deal with '('
+00D0E4  1               
+00D0E4  1  20 FC D0     INIT1: 	JSR LD0FC
+00D0E7  1  A2 B4        		LDX #$B4
+00D0E9  1  D0 20        		BNE LD10B
+00D0EB  1  18           BEP_ARG:clc
+00D0EC  1  66 73        LD0EC: 	ror $73
+00D0EE  1  A2 AC        		ldx     #$AC
+00D0F0  1  D0 19        		bne     LD10B 	; spring altijd
+00D0F2  1               
+00D0F2  1  20 44 D8     LD0F2: 	jsr 	LD85D ; kopier stack naar werkruimte
+00D0F5  1  20 06 D1     LD0F5: 	jsr 	LD106  ; we doen wat recursie voor haakjes, functies etc
+00D0F8  1  A2 A1        LD0F8: 	ldx 	#$A1
+00D0FA  1  D0 0F        		bne     LD10B ;	spring altijd
+00D0FC  1  20 F5 D0     LD0FC: 	jsr 	LD0F5  ; nog meer recursie
+00D0FF  1  A2 9A        LD0FF: 	ldx #$9A
+00D101  1  D0 08        		bne     LD10B 	; spring altijd
+00D103  1               
+00D103  1  20 44 D8     LD103: 	jsr 	LD85D  ; kopier stack naar werkruimte
+00D106  1  20 EB D0     LD106: 	jsr BEP_ARG
+00D109  1  A2 A8        LD109: 	ldx #$A8
+00D10B  1               
+00D10B  1  18           LD10B: 	clc
+00D10C  1  90 05        		bcc LD113  ; geforceerde sprong in het duister
+00D10E  1               
+00D10E  1  A2 5F        		ldx     #$5F
+00D110  1  84 03        		sty $03
+00D112  1  38           LD112: 	sec
+00D113  1  66 53        LD113: 	ror $53
+00D115  1  A4 03        		ldy $03
+00D117  1  88           		dey
+00D118  1  C8           LD118: 	iny
+00D119  1  B1 05        		lda ($05),y
+00D11B  1  C9 20        		cmp     #$20
+00D11D  1  F0 F9        		beq     LD118
+00D11F  1  88           		dey
+00D120  1  84 52        		sty $52
+00D122  1  CA           		dex
+00D123  1  A4 52        LD123: 	ldy $52
+00D125  1  E8           LD125: 	inx
+00D126  1  C8           		iny
+00D127  1  BD 06 D0     LD127: 	lda XD006,x
+00D12A  1  30 1A        		bmi LD146
+00D12C  1  D1 05        		cmp ($05),y
+00D12E  1  F0 F5        		beq     LD125
+00D130  1  CA           		dex
+00D131  1  E8           LD131: 	inx
+00D132  1  BD 06 D0     		lda 	XD006,x
+00D135  1  10 FA        		bpl     LD131
+00D137  1  E8           		inx
+00D138  1  24 53        		bit 	$53
+00D13A  1  10 E7        		bpl     LD123
+00D13C  1  B1 05        		lda ($05),y
+00D13E  1  C9 2E        		cmp #'.'      ; afgekort?
+00D140  1  D0 E1        		bne     LD123
+00D142  1  C8           		iny
+00D143  1  CA           		dex
+00D144  1  B0 E1        		bcs     LD127
+00D146  1  C9 FE        LD146: 	cmp #$FE      ; einde tabel?
+00D148  1  B0 11        		bcs     LD15B
+00D14A  1  85 53        		sta $53
+00D14C  1  BD 07 D0     		lda     $D007,x
+00D14F  1  85 52        		sta $52
+00D151  1  84 03        		sty $03
+00D153  1  A6 04        		ldx $04
+00D155  1  6C 52 00     		jmp ($0052)      ; jump naar de kanibalen.
+00D158  1  A6 04        LD158: 	ldx $04
+00D15A  1  60           		rts
+00D15B  1               ;
+00D15B  1  F0 FB        LD15B: 	beq LD158
+00D15D  1  00           		brk      ; valt geen chocola van te maken: fp fout.
+00D15E  1               ;D15E Floating Point interpreter
+00D15E  1  84 03        INIT: 	sty $03
+00D160  1  20 EC D0     		jsr     LD0EC
+00D163  1  20 81 D8     		jsr     LD89A
+00D166  1  A5 5A        		lda 	$5A
+00D168  1  85 60        		sta 	$60
+00D16A  1  A5 5B        		lda 	$5B
+00D16C  1  85 5F        		sta 	$5F
+00D16E  1  A5 5C        		lda 	$5C
+00D170  1  85 5E        		sta 	$5E
+00D172  1  A0 5D        		ldy     #$5D
+00D174  1  4C 9F C9     		jmp     LC99F
+00D177  1               
+00D177  1               ; D177 Deals with '+'
+00D177  1               FP_PLS:    ; eerste argument is beschikbaar als we hier zijn
+00D177  1  20 F2 D0     		jsr 	LD0F2  ; haal eerste en tweede argument op
+00D17A  1  20 57 D8             jsr     LD870
+00D17D  1  20 F5 D7             jsr     LD804
+00D180  1  20 99 DA     		jsr		PUTF2	; zet de atom waardes klaar voor de fpga ; eerste argument overpompen
+00D183  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga ; HIER TWEEDE argument
+00D186  1  A9 01        		lda 	#FPADD  ; afdeling optellen
+00D188  1  20 E0 DA     		jsr		procesfpga
+00D18B  1               
+00D18B  1  4C FF D0     		jmp 	LD0FF  ; staat nu op 0x59 en verder
+00D18E  1               
+00D18E  1               ; D183 Deals with '-'
+00D18E  1               FP_MIN:
+00D18E  1  20 F2 D0             jsr     LD0F2           ; FP MIN
+00D191  1  20 57 D8             jsr     LD870
+00D194  1  20 F5 D7             jsr     LD804
+00D197  1  20 99 DA     		jsr		PUTF2	; zet de atom waardes klaar voor de fpga ; eerste argument overpompen
+00D19A  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga ; HIER TWEEDE argument
+00D19D  1  A9 02                lda     #FPSUB
+00D19F  1  20 E0 DA     		jsr		procesfpga
+00D1A2  1               
+00D1A2  1  4C FF D0     		jmp     LD0FF
+00D1A5  1               ;
+00D1A5  1               FP_MAAL:
+00D1A5  1  20 03 D1             jsr     LD103           ; FP MAAL
+00D1A8  1  20 57 D8             jsr     LD870
+00D1AB  1  20 F5 D7             jsr     LD804
+00D1AE  1  20 99 DA     		jsr		PUTF2	; zet de atom waardes klaar voor de fpga ; eerste argument overpompen
+00D1B1  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga ; HIER TWEEDE argument
+00D1B4  1  A9 03        		lda 	#FPMUL
+00D1B6  1  20 E0 DA     		jsr		procesfpga
+00D1B9  1               
+00D1B9  1  4C F8 D0     		jmp     LD0F8
+00D1BC  1               ;
+00D1BC  1               FP_DIV:
+00D1BC  1  20 03 D1             jsr     LD103           ; FP GEDEELD
+00D1BF  1  20 57 D8             jsr     LD870
+00D1C2  1  20 F5 D7             jsr     LD804
+00D1C5  1  20 99 DA     		jsr		PUTF2	; zet de atom waardes klaar voor de fpga ; eerste argument overpompen
+00D1C8  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga ; HIER TWEEDE argument
+00D1CB  1  A9 04                lda     #FPDIV
+00D1CD  1  20 E0 DA     		jsr		procesfpga
+00D1D0  1               
+00D1D0  1  4C F8 D0     		jmp     LD0F8
+00D1D3  1               ;
+00D1D3  1               FP_MACH:
+00D1D3  1  20 03 D1             jsr     LD103           ; FP GEDEELD
+00D1D6  1  20 8D D6     		jsr 	BEP_NUL     ; bepaal waarde argument
+00D1D9  1  F0 14        		beq 	END_MC     ; bij 0 doen we nix
+00D1DB  1  10 01        		bpl 	mch_verder  ; boven 0 kan wortel bepaald worden
+00D1DD  1  00           		brk      ; daaronder gaan we gillend op ons bek
+00D1DE  1               mch_verder:
+00D1DE  1  20 57 D8             jsr     LD870
+00D1E1  1  20 F5 D7             jsr     LD804
+00D1E4  1  20 99 DA     		jsr		PUTF2	; zet de atom waardes klaar voor de fpga ; eerste argument overpompen
+00D1E7  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga ; HIER TWEEDE argument
+00D1EA  1  A9 11        		lda 	#FPYTOX
+00D1EC  1  20 E0 DA     		jsr		procesfpga
+00D1EF  1               
+00D1EF  1                       ;jsr     pc_opdracht2
+00D1EF  1                       ;jsr     naar_pc1
+00D1EF  1               		;jsr van_pc
+00D1EF  1  4C 09 D1     END_MC: jmp LD109
+00D1F2  1               ;
+00D1F2  1  20 01 D2     FPL_min: 	jsr     FPL_pl
+00D1F5  1  20 8D D6     LD1BF:  	jsr  BEP_NUL
+00D1F8  1  F0 06        			beq  FPL_end
+00D1FA  1  A5 57        chng_sg: lda  $57
+00D1FC  1  49 80        		eor  #$80       ; verander teken
+00D1FE  1  85 57        		sta  $57 ; deze had ik op 5a gezet..
+00D200  1  60           FPL_end: rts
+00D201  1               ;
+00D201  1  A4 03        FPL_pl: ldy  $03   ; FP plus?
+00D203  1  88           		dey
+00D204  1  C8           skp_spc: iny
+00D205  1  B1 05        		lda  ($05),y
+00D207  1  C9 20        		cmp  #' '       ; spatie ?
+00D209  1  F0 F9        		beq  skp_spc      ; ja, dan skip
+00D20B  1  C9 25        		cmp  #'%'       ; fp. variabele?
+00D20D  1  D0 32        		bne  LD20B       ; nee, door naar ..
+00D20F  1  E6 03        		inc  $03     ; verhoog adres
+00D211  1  20 4B D4     		jsr  waarde_uit_var      ; haal waarde uit var
+00D214  1  90 2B        		bcc  LD20B
+00D216  1  A0 6F        		ldy  #$6F
+00D218  1  20 CD C3     		jsr  LC3CD
+00D21B  1               copy_waarde:
+00D21B  1  A0 04        		ldy  #$04      ; clear waarde
+00D21D  1  A9 00        		lda  #$0
+00D21F  1  85 5E        		sta  $5E
+00D221  1  85 58        		sta  $58
+00D223  1  85 57        		sta  $57
+00D225  1               copy_lus:
+00D225  1  B1 6F        		lda  ($6F),y
+00D227  1  99 59 00     		sta  $59,y
+00D22A  1  05 57        		ora  $57
+00D22C  1  85 57        		sta  $57
+00D22E  1  88           		dey
+00D22F  1  10 F4        		bpl  	copy_lus
+00D231  1  AA           		tax
+00D232  1  F0 09        		beq  	LD207  ; hij, de laagste waarde 59 is 0
+00D234  1  A5 5A        		lda  	$5A
+00D236  1  85 57        		sta  	$57       ; zet koud in 57
+00D238  1  09 80                ora     #$80           ; forceer bit
+00D23A  1  85 5A        		sta  	$5A       ; en terug in zijn hok (maar waarom???
+00D23C  1  8A           		txa   ; een return waarde 59 in a
+00D23D  1  60           LD207:  rts
+00D23E  1               ;
+00D23E  1  84 03        LD208:  sty $03
+00D240  1  60           		rts
+00D241  1               ;
+00D241  1  20 AC D5     LD20B: 	jsr     LD5A5
+00D244  1  B0 F8        		bcs     LD208
+00D246  1  A2 00        		ldx 	#$0
+00D248  1  4C 12 D1     		jmp     LD112
+00D24B  1               ;
+00D24B  1  20 EB D0     ABS: 	jsr 	BEP_ARG
+00D24E  1  20 8D D6     		jsr 	BEP_NUL
+00D251  1  30 A7        		bmi 	chng_sg      ; voor <1 naar de 0 anders klaar
+00D253  1  60           		rts
+00D254  1               ;
+00D254  1  20 EB D0     ACS: 	jsr 	BEP_ARG      ; buurten bij argument routine
+00D257  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00D25A  1  A9 15        		lda 	#FPACS     ; afdeling arc cosinus
+00D25C  1  4C E0 DA     		jmp		procesfpga
+00D25F  1               ;		rts
+00D25F  1               
+00D25F  1               ;
+00D25F  1  20 EB D0     ASN: 	jsr BEP_ARG
+00D262  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00D265  1  A9 16        		lda 	#FPASN     ; afdeling arc sinus
+00D267  1  4C E0 DA     		jmp		procesfpga
+00D26A  1               ;		 rts
+00D26A  1               ;
+00D26A  1  20 EB D0     RAD: 	jsr BEP_ARG
+00D26D  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00D270  1  A9 0C        		lda 	#FPRAD     ; afdeling radiatoren
+00D272  1  4C E0 DA     		jmp		procesfpga
+00D275  1               ;		rts
+00D275  1               ;
+00D275  1  20 EB D0     DEG: 	jsr BEP_ARG
+00D278  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00D27B  1  A9 0B        		lda 	#FPDEG     ; afdeling GRADEN
+00D27D  1  4C E0 DA     		jmp		procesfpga
+00D280  1               ;		rts
+00D280  1  20 EB D0     SGN: 	jsr 	BEP_ARG
+00D283  1  20 8D D6     		jsr 	BEP_NUL
+00D286  1  F0 07        		beq 	isalnul
+00D288  1  48           		pha
+00D289  1  20 80 DB     		jsr 	LDE8D     ; een -1 een 0 of een 1
+00D28C  1  68           		pla
+00D28D  1  85 57        		sta $57
+00D28F  1               isalnul:
+00D28F  1  60           		rts
+00D290  1               ;
+00D290  1  24 73        PER1: 	bit 	$73
+00D292  1  30 26        		bmi     LD2C0
+00D294  1  20 BC C8     FLT: 	jsr 	LC8BC
+00D297  1  A0 5D        		ldy     #$5D
+00D299  1  20 CD C3     		jsr     LC3CD
+00D29C  1  85 5A        		sta 	$5A
+00D29E  1  A5 5F        		lda 	$5F
+00D2A0  1  85 5B        		sta 	$5B
+00D2A2  1  A5 5E        		lda 	$5E
+00D2A4  1  85 5C        		sta 	$5C
+00D2A6  1  A9 A0        		lda     #$A0
+00D2A8  1  85 59        		sta 	$59
+00D2AA  1  A0 00        		ldy 	#$0
+00D2AC  1  84 5E        		sty 	$5E
+00D2AE  1  A5 5A        		lda 	$5A
+00D2B0  1  85 57        		sta 	$57
+00D2B2  1  10 03        		bpl     LD2BD
+00D2B4  1  20 BC D8     		jsr     LD8D5
+00D2B7  1  4C B9 D7     LD2BD: 	jmp     LD7C8
+00D2BA  1  4C 1B CA     LD2C0: 	jmp     LCA1B
+00D2BD  1               ;
+00D2BD  1  A9 82        PI:		lda     #$82
+00D2BF  1  85 59        		sta 	$59
+00D2C1  1  A9 C9                lda     #$C9
+00D2C3  1  85 5A        		sta 	$5a
+00D2C5  1  A9 0F                lda     #$0f
+00D2C7  1  85 5B        		sta 	$5b
+00D2C9  1  A9 DA                lda     #$da
+00D2CB  1  85 5C        		sta 	$5c
+00D2CD  1  A9 A2                lda     #$a2
+00D2CF  1  85 5D        		sta 	$5d
+00D2D1  1  60           		rts
+00D2D2  1               ;
+00D2D2  1  20 3E CF     FGET: 	jsr 	LCF3E
+00D2D5  1  A2 04        		ldx 	#$04   ; haal 5 bytes uit geopende file
+00D2D7  1               LD2D1:
+00D2D7  1  20 D4 FF     		jsr 	LFFD4   ; get byte uit handle
+00D2DA  1  9D C5 03     		sta 	$03C5,x   ; zet hem weg
+00D2DD  1  CA           		dex
+00D2DE  1  10 F7        		bpl 	LD2D1   ; totdat we er 5 hebben
+00D2E0  1  20 0D DB     		jsr 	LDBAA   ; ?
+00D2E3  1  4C 1B D2     		jmp 	copy_waarde  ; zet hem op de gewenst plek
+00D2E6  1  00           LDbrk: 	BRK  ; inserted om ass. error te voorkomen
+00D2E7  1               ;
+00D2E7  1  20 B1 CE     VAL: 	jsr 	LCEB1   ; neem het fatsoenlijk numeriek deel
+00D2EA  1  A0 00         ldy #$0
+00D2EC  1               LD2E4:
+00D2EC  1  20 0B D3      jsr     LD304
+00D2EF  1  C9 2B         cmp #'+'
+00D2F1  1  F0 0F         beq     LD2FB
+00D2F3  1  C9 2D         cmp #'-'
+00D2F5  1  D0 0E         bne     LD2FE
+00D2F7  1  20 0A D3      jsr     LD303
+00D2FA  1  84 54         sty $54
+00D2FC  1  20 B8 D5      jsr     LD5B1
+00D2FF  1  4C F5 D1      jmp     LD1BF
+00D302  1               ;
+00D302  1               LD2FB:
+00D302  1  20 0A D3      jsr     LD303
+00D305  1               LD2FE:
+00D305  1  84 54         sty $54
+00D307  1  4C B8 D5      jmp LD5B1   ; hier zijn we klaar
+00D30A  1               ;
+00D30A  1               LD303:     ; skip space
+00D30A  1  C8            iny
+00D30B  1               LD304:
+00D30B  1  B1 52         lda ($52),y
+00D30D  1  C9 20         cmp #' '   ; is het een spatie
+00D30F  1  F0 F9         beq     LD303
+00D311  1  60            rts
+00D312  1               ;
+00D312  1  20 4B D4     VAR: jsr waarde_uit_var
+00D315  1  90 CF         bcc LDbrk
+00D317  1  20 79 C2      jsr     LC279
+00D31A  1  20 FC D0      jsr     LD0FC
+00D31D  1  20 E4 C4      jsr     LC4E4
+00D320  1  20 1D D8             jsr     Sla_op
+00D323  1  4C 5B C5      jmp LC55B   ; volgende statement
+00D326  1               ;
+00D326  1  20 FC D0     STR: jsr LD0FC
+00D329  1  20 31 C2      jsr     LC231
+00D32C  1  20 E1 C4      jsr     LC4E1
+00D32F  1  20 CB C3      jsr     LC3CB
+00D332  1  20 D7 D4      jsr     LD4D0
+00D335  1  4C 5B C5      jmp LC55B   ; volgende statement
+00D338  1               ;
+00D338  1  20 72 C3     FPRINT: jsr LC372
+00D33B  1  A2 B8         ldx     #$B8
+00D33D  1  4C 0B D1      jmp LD10B   ; bepaal deel van argument
+00D340  1               ;
+00D340  1  20 FC D0     LD339: jsr LD0FC
+00D343  1  A9 C5         lda     #$C5
+00D345  1  85 52         sta $52
+00D347  1  A9 03         lda     #$03
+00D349  1  85 53         sta $53
+00D34B  1  20 D7 D4      jsr     LD4D0
+00D34E  1  C6 6F         dec $6F
+00D350  1  AD 21 03      lda $0321   ; neemde waarde in @
+00D353  1  38            sec
+00D354  1  E5 6F         sbc $6F
+00D356  1  90 0B         bcc     LD35C
+00D358  1  F0 09         beq     LD35C
+00D35A  1  A8            tay
+00D35B  1  A9 20         lda     #$20
+00D35D  1               pr_sp:
+00D35D  1  20 4C CA      jsr LCA4C   ; print 'Y' spaties
+00D360  1  88            dey
+00D361  1  D0 FA         bne pr_sp
+00D363  1               LD35C:
+00D363  1  A0 00         ldy #$0
+00D365  1               LD35E:
+00D365  1  B1 52         lda ($52),y
+00D367  1  C9 0D         cmp #$0D   ; einde van de opdracht
+00D369  1  F0 CD         beq FPRINT
+00D36B  1  20 4C CA      jsr     LCA4C
+00D36E  1  C8            iny
+00D36F  1  D0 F4         bne     LD35E
+00D371  1  20 72 C3     FINPUT: jsr LC372
+00D374  1  B1 05         lda ($05),y
+00D376  1  C9 25         cmp #'%'   ; fp. variabele in aantocht?
+00D378  1  D0 08         bne LD37B   ; nee,
+00D37A  1  C8            iny
+00D37B  1  84 03         sty $03
+00D37D  1  20 4B D4      jsr waarde_uit_var
+00D380  1  B0 05         bcs     LD380
+00D382  1               LD37B:
+00D382  1  A2 C3         ldx     #$C3
+00D384  1  4C 0B D1      jmp LD10B   ; bepaal deel van argument
+00D387  1               ;
+00D387  1               LD380:
+00D387  1  20 09 CD      jsr     LCD09
+00D38A  1  A8            tay
+00D38B  1  A5 05         lda $05
+00D38D  1  48            pha
+00D38E  1  A5 06         lda $06
+00D390  1  48            pha
+00D391  1  A5 03         lda $03
+00D393  1  48            pha
+00D394  1  84 03         sty $03
+00D396  1  C8            iny
+00D397  1  84 06         sty $06
+00D399  1  A9 40         lda     #$40
+00D39B  1  85 05         sta $05
+00D39D  1  20 FC D0      jsr     LD0FC
+00D3A0  1  68            pla
+00D3A1  1  85 03         sta $03
+00D3A3  1  68            pla
+00D3A4  1  85 06         sta $06
+00D3A6  1  68            pla
+00D3A7  1  85 05         sta $05
+00D3A9  1  20 1D D8      jsr Sla_op
+00D3AC  1  4C 82 D3      jmp     LD37B
+00D3AF  1               ;
+00D3AF  1  20 C0 D9     FIF: jsr LD9EB     ; vergelijken; Zet Cxxx adres op stack
+00D3B2  1  4C 69 C5      jmp     LC569
+00D3B5  1               ;
+00D3B5  1  20 C0 D9     FUNTIL: jsr LD9EB     ; zet het return adres HIGH van Cxxx op stack
+00D3B8  1  4C D5 CC      jmp LCCD5     ; ook vergelijken
+00D3BB  1               ;
+00D3BB  1  20 9B D4     FPUT: jsr LD494     ; plaats 5 bytes naar output
+00D3BE  1  20 FC D0      jsr     LD0FC
+00D3C1  1  20 E4 C4      jsr     LC4E4
+00D3C4  1  20 18 D8      jsr     LD831
+00D3C7  1  A6 04         ldx $04   ; 5 bytes
+00D3C9  1  20 41 CF      jsr     LCF41
+00D3CC  1  A2 04         ldx #$04     ; 5 bytes
+00D3CE  1               LD3C7:
+00D3CE  1  BD C5 03      lda $03C5,x     ; haal hem op
+00D3D1  1  20 D1 FF      jsr LFFD1     ; stuur hem weg
+00D3D4  1  CA            dex
+00D3D5  1  10 F7         bpl LD3C7     ; en dat 5 keer
+00D3D7  1  4C 5B C5      jmp LC55B     ; klaar zijn we
+00D3DA  1               ;
+00D3DA  1  A5 01        FDIM: lda $01
+00D3DC  1  05 02         ora $02
+00D3DE  1  F0 6A         beq     LD443
+00D3E0  1  20 34 C4      jsr     LC434
+00D3E3  1  B0 65         bcs     LD443
+00D3E5  1  A4 03         ldy $03
+00D3E7  1  B1 05         lda ($05),y
+00D3E9  1  C9 25         cmp #'%'   ; praten we over fp. getallen
+00D3EB  1  D0 5D         bne LD443   ; nee.
+00D3ED  1  C8            iny
+00D3EE  1  B1 05         lda ($05),y        ; haal waarde op
+00D3F0  1  C8            iny
+00D3F1  1  D1 05         cmp ($05),y        ; vergelijk met bovenbuurvrouw (AA-ZZ)
+00D3F3  1  D0 55         bne LD443   ; nee, niet gelijk. Helemaal fout dus.
+00D3F5  1  C9 5B         cmp #'['   ; groter dan Z
+00D3F7  1  B0 51         bcs LD443   ; Ja, helemaal fout dus.
+00D3F9  1  E9 3F         sbc #$3F   ; maak van ascii absolute waarde
+00D3FB  1  90 4D         bcc LD443   ; <0? (A), foute boel dus. Wegwezen.
+00D3FD  1  C8            iny
+00D3FE  1  84 03         sty $03
+00D400  1  48            pha
+00D401  1  20 8B C7      jsr LC78B   ; argument ophalen.
+00D404  1  F6 15         inc $15,x
+00D406  1  D0 02         bne     LD403
+00D408  1  F6 24         inc $24,x
+00D40A  1               LD403:
+00D40A  1  20 A1 D4      jsr     LD49A
+00D40D  1  68            pla
+00D40E  1  A8            tay
+00D40F  1  18            clc
+00D410  1  A5 23         lda $23        ; top
+00D412  1  99 87 06      sta $0687,y   ; basisopstelling
+00D415  1  65 16         adc $16
+00D417  1  85 23         sta $23
+00D419  1  A5 24         lda $24
+00D41B  1  99 A2 06      sta $06A2,y   ; basisopstelling high
+00D41E  1  65 25         adc $25
+00D420  1  85 24         sta $24
+00D422  1  A0 00         ldy #$0
+00D424  1  84 04         sty $04
+00D426  1  A9 AA         lda     #$AA
+00D428  1  91 23         sta ($23),y        ; kijk of hier ook ram zit
+00D42A  1  D1 23         cmp ($23),y
+00D42C  1  D0 1C         bne LD443   ; helaas. Past dus niet meer. Fout.
+00D42E  1  4A            lsr a   ; extra testje, ivm spiegels
+00D42F  1  91 23         sta ($23),y
+00D431  1  D1 23         cmp ($23),y
+00D433  1  D0 15         bne LD443   ; alsnog fout. Zonde, he?
+00D435  1  20 34 C4      jsr LC434   ; alles fris.
+00D438  1  B0 10         bcs     LD443
+00D43A  1  A4 03         ldy $03
+00D43C  1  B1 05         lda ($05),y
+00D43E  1  C9 2C         cmp #','   ; wordt er soms nog meer gedimmed?
+00D440  1  D0 05         bne LD440   ; nee, het volgende statement aande beurt
+00D442  1  E6 03         inc $03
+00D444  1  4C DA D3      jmp FDIM   ; ja, dan doen we het nog eens.
+00D447  1               LD440:
+00D447  1  4C 58 C5      jmp     LC558
+00D44A  1               ;
+00D44A  1  00           LD443: brk
+00D44B  1               ;
+00D44B  1               waarde_uit_var:
+00D44B  1  20 34 C4      jsr LC434  ; geldige variabele naam?
+00D44E  1  90 0E         bcc LD457  ; neen. Dikke mik dus. Misschien direct?
+00D450  1  B5 15         lda $15,x
+00D452  1  0A            asl     a
+00D453  1  0A            asl     a
+00D454  1  75 15         adc $15,x
+00D456  1  95 15         sta $15,x
+00D458  1  A9 28         lda     #$28 ; base page?
+00D45A  1  95 24         sta $24,x
+00D45C  1  38            sec
+00D45D  1  60            rts
+00D45E  1               ;
+00D45E  1               LD457:
+00D45E  1  A4 03         ldy $03
+00D460  1  B1 05         lda ($05),y     ; byte from commandline
+00D462  1  C9 21         cmp #'!'       ; is het de pling?
+00D464  1  D0 07         bne no_pling      ; nee.
+00D466  1  E6 03         inc $03
+00D468  1  20 BC C8      jsr     LC8BC
+00D46B  1               LD464:
+00D46B  1  38            sec
+00D46C  1  60            rts
+00D46D  1               ;
+00D46D  1               no_pling:
+00D46D  1  C8            iny
+00D46E  1  D1 05         cmp ($05),y
+00D470  1  D0 08         bne     LD473
+00D472  1  C9 5B         cmp #'['   ; zitten we in de reeks van A-Z
+00D474  1  B0 04         bcs     LD473
+00D476  1  E9 3F         sbc #$3F   ; maak absolute waarde van
+00D478  1  B0 02         bcs LD475   ; als geldig (>0) gaan we door
+00D47A  1  18           LD473: clc    ; ziet er niet fris uit.
+00D47B  1  60            rts
+00D47C  1               ;
+00D47C  1  C8           LD475: iny
+00D47D  1  84 03         sty $03
+00D47F  1  48            pha
+00D480  1  20 BC C8      jsr     LC8BC
+00D483  1  20 A1 D4      jsr LD49A   ; bepaal y-> als variabele
+00D486  1  68            pla
+00D487  1  A8            tay
+00D488  1  B0 10         bcs     LD493
+00D48A  1  B9 87 06      lda $0687,y   ; haal onze vrienden op uit page 6
+00D48D  1  75 15         adc $15,x
+00D48F  1  95 15         sta $15,x
+00D491  1  B9 A2 06      lda     $06A2,y
+00D494  1  75 24         adc $24,x
+00D496  1  95 24         sta $24,x        ; en sla ze op
+00D498  1  90 D1         bcc     LD464
+00D49A  1               LD493:
+00D49A  1  00            brk
+00D49B  1               LD494:
+00D49B  1  20 BC C8      jsr     LC8BC
+00D49E  1  4C 31 C2      jmp     LC231
+00D4A1  1               ;
+00D4A1  1               LD49A:
+00D4A1  1  B4 24         ldy $24,x
+00D4A3  1  B5 15         lda $15,x
+00D4A5  1  0A            asl     a
+00D4A6  1  36 24         rol $24,x
+00D4A8  1  0A            asl     a
+00D4A9  1  36 24         rol $24,x
+00D4AB  1  18            clc
+00D4AC  1  75 15         adc $15,x
+00D4AE  1  95 15         sta $15,x
+00D4B0  1  98            tya
+00D4B1  1  75 24         adc $24,x
+00D4B3  1  95 24         sta $24,x
+00D4B5  1  60            rts
+00D4B6  1               ;
+00D4B6  1  AD 00 A0     OTHERROM: lda   $A000
+00D4B9  1  C9 40        	cmp     #$40
+00D4BB  1  F0 0A        	beq     LD4C0
+00D4BD  1  AD 01 A0     	lda     $A001
+00D4C0  1  C9 BF        	cmp     #$BF
+00D4C2  1  D0 83        	bne     LD440
+00D4C4  1  4C 02 A0     	jmp     LA002
+00D4C7  1               LD4C0:
+00D4C7  1  4C 58 C5     	JMP 	$C558 ;      Do interpreter post test
+00D4CA  1                ;jmp L1002   ; naar onze rom manager.
+00D4CA  1               ;
+00D4CA  1               ASC2DEC:
+00D4CA  1  C9 3A        	cmp 	#$3A     ; HEX A-F
+00D4CC  1  B0 07        	bcs 	A_error
+00D4CE  1  C9 30        	cmp 	#$30     ; LAGER DAN 0
+00D4D0  1  90 02        	bcc 	A_ok
+00D4D2  1  E9 30        	sbc     #$30
+00D4D4  1  60           A_ok: rts
+00D4D5  1               ;
+00D4D5  1               A_error:
+00D4D5  1  18           	clc
+00D4D6  1  60           	rts
+00D4D7  1               ;
+00D4D7  1               LD4D0:
+00D4D7  1  A9 00         lda #$0
+00D4D9  1  85 6F         sta $6F
+00D4DB  1  20 8D D6      jsr BEP_NUL
+00D4DE  1  D0 12         bne LD4EB  ; geen null, dus geen default print 0.0
+00D4E0  1  A9 30         lda #'0'  ; een null
+00D4E2  1  20 94 D5      jsr In_Buf   ; store waarde in buffer en verhoog adres
+00D4E5  1  A9 2E         lda #'.'  ; een punt
+00D4E7  1  20 94 D5      jsr In_Buf   ; store waarde in buffer en verhoog adres
+00D4EA  1  A9 30         lda #'0'  ; een null
+00D4EC  1  20 94 D5      jsr In_Buf   ; store waarde in buffer en verhoog adres
+00D4EF  1  4C 78 D5      jmp     LD571
+00D4F2  1               ;
+00D4F2  1               LD4EB:
+00D4F2  1  10 05         bpl LD4F2  ; groter dan 0? ja,
+00D4F4  1  A9 2D         lda #'-'  ; een minnetje
+00D4F6  1  20 94 D5      jsr In_Buf   ; store waarde in buffer en verhoog adres
+00D4F9  1               LD4F2:
+00D4F9  1  A9 00         lda #$0
+00D4FB  1  85 6D         sta $6D
+00D4FD  1               LD4F6:
+00D4FD  1  A5 59         lda $59
+00D4FF  1  C9 81         cmp     #$81
+00D501  1  B0 08         bcs     LD504
+00D503  1  20 A7 D6      jsr     LD6A0
+00D506  1  C6 6D         dec $6D
+00D508  1  4C FD D4      jmp     LD4F6
+00D50B  1               ;
+00D50B  1               LD504:
+00D50B  1  C9 84         cmp     #$84
+00D50D  1  90 10         bcc     LD518
+00D50F  1  D0 06         bne     LD510
+00D511  1  A5 5A         lda $5A
+00D513  1  C9 A0         cmp #$A0     ; groter dan ?
+00D515  1  90 08         bcc LD518     ; nee
+00D517  1               LD510:
+00D517  1  20 22 D7      jsr     LD71B
+00D51A  1  E6 6D         inc $6D
+00D51C  1  4C FD D4      jmp     LD4F6
+00D51F  1               ;
+00D51F  1               LD518:
+00D51F  1  A5 59         lda $59
+00D521  1  C9 84         cmp     #$84
+00D523  1  B0 07         bcs     LD525
+00D525  1  20 DF D6      jsr     LD6D8
+00D528  1  E6 59         inc $59
+00D52A  1  D0 F3         bne     LD518
+00D52C  1               LD525:
+00D52C  1  38            sec
+00D52D  1  A9 FF         lda     #$FF
+00D52F  1  20 3D D6      jsr     LD636
+00D532  1  A5 5A         lda $5A
+00D534  1  C9 A0         cmp     #$A0
+00D536  1  B0 DF         bcs     LD510
+00D538  1  A9 01         lda     #$01
+00D53A  1  A4 6D         ldy $6D
+00D53C  1  30 0A         bmi     LD541
+00D53E  1  C0 08         cpy     #$08
+00D540  1  B0 06         bcs     LD541
+00D542  1  C8            iny
+00D543  1  A9 00         lda #$0
+00D545  1  85 6D         sta $6D
+00D547  1  98            tya
+00D548  1               LD541:
+00D548  1  85 70         sta $70
+00D54A  1  A2 09         ldx     #$09
+00D54C  1  86 54         stx $54
+00D54E  1               LD547:
+00D54E  1  20 7C D5      jsr     LD575
+00D551  1  C6 70         dec $70
+00D553  1  D0 05         bne     LD553
+00D555  1  A9 2E         lda #'.'
+00D557  1  20 94 D5      jsr In_Buf  ; store waarde in buffer en verhoog adres
+00D55A  1               LD553:
+00D55A  1  C6 54         dec $54
+00D55C  1  D0 F0         bne     LD547
+00D55E  1  A5 6D         lda $6D
+00D560  1  F0 16         beq     LD571
+00D562  1  A9 45         lda #'E'  ; pratend over e macht notatie
+00D564  1  20 94 D5      jsr In_Buf  ; store waarde in buffer en verhoog adres
+00D567  1  A5 6D         lda $6D
+00D569  1  10 0A         bpl LD56E  ; niet te klein?
+00D56B  1  A9 2D         lda #'-'
+00D56D  1  20 94 D5      jsr In_Buf
+00D570  1  38            sec
+00D571  1  A9 00         lda #$0
+00D573  1  E5 6D         sbc $6D
+00D575  1               LD56E:
+00D575  1  20 8E D5      jsr     LD587
+00D578  1               LD571:
+00D578  1  A9 0D         lda #$0D  ; een CR als einde buffer
+00D57A  1  D0 18         bne In_Buf  ; store waarde in buffer en verhoog adres
+00D57C  1               LD575:
+00D57C  1  A5 5A         lda $5A
+00D57E  1  4A            lsr     a
+00D57F  1  4A            lsr     a
+00D580  1  4A            lsr     a
+00D581  1  4A            lsr     a
+00D582  1  20 92 D5      jsr     LD58B
+00D585  1  A5 5A         lda $5A
+00D587  1  29 0F         and     #$0F
+00D589  1  85 5A         sta $5A
+00D58B  1  4C 55 D6      jmp     LD64E
+00D58E  1               ;
+00D58E  1               LD587:
+00D58E  1  C9 0A         cmp     #$0A
+00D590  1  B0 09         bcs     LD594
+00D592  1               LD58B:
+00D592  1  09 30         ora     #$30
+00D594  1               In_Buf:
+00D594  1  A4 6F         ldy $6F        ; plaats de ASCII in buffer
+00D596  1  91 52         sta ($52),y
+00D598  1  E6 6F         inc $6F
+00D59A  1  60            rts
+00D59B  1               ;
+00D59B  1               LD594:
+00D59B  1  A2 FF         ldx     #$FF
+00D59D  1               LD596:
+00D59D  1  E8            inx
+00D59E  1  E9 0A         sbc     #$0A
+00D5A0  1  B0 FB         bcs     LD596
+00D5A2  1  69 0A         adc     #$0A
+00D5A4  1  48            pha
+00D5A5  1  8A            txa
+00D5A6  1  20 8E D5      jsr     LD587
+00D5A9  1  68            pla
+00D5AA  1  10 E6         bpl     LD58B
+00D5AC  1               LD5A5:
+00D5AC  1  A5 03         lda $03
+00D5AE  1  85 54         sta $54
+00D5B0  1  A5 05         lda $05
+00D5B2  1  85 52         sta $52
+00D5B4  1  A5 06         lda $06
+00D5B6  1  85 53         sta $53
+00D5B8  1               LD5B1:
+00D5B8  1  20 6B DA      jsr CLR_WRK
+00D5BB  1  85 6C         sta $6C
+00D5BD  1  85 6D         sta $6D
+00D5BF  1  20 82 D6      jsr     LD67B
+00D5C2  1  C9 2E         cmp #'.'
+00D5C4  1  F0 0E         beq     LD5CD
+00D5C6  1  20 CA D4      jsr ASC2DEC
+00D5C9  1  90 71         bcc     LD635
+00D5CB  1  85 5E         sta $5E
+00D5CD  1               LD5C6:
+00D5CD  1  20 82 D6      jsr     LD67B
+00D5D0  1  C9 2E         cmp #'.'
+00D5D2  1  D0 09         bne     LD5D6
+00D5D4  1               LD5CD:
+00D5D4  1  A5 6C         lda $6C
+00D5D6  1  18            clc
+00D5D7  1  D0 3A         bne     LD60C
+00D5D9  1  E6 6C         inc $6C
+00D5DB  1  D0 F0         bne     LD5C6
+00D5DD  1               LD5D6:
+00D5DD  1  C9 45         cmp #'E'
+00D5DF  1  F0 27         beq     LD601
+00D5E1  1  20 CA D4      jsr ASC2DEC
+00D5E4  1  90 2D         bcc     LD60C
+00D5E6  1  85 6E         sta $6E
+00D5E8  1  A5 5A         lda $5A
+00D5EA  1  C9 18         cmp     #$18
+00D5EC  1  90 08         bcc     LD5EF
+00D5EE  1  A5 6C         lda $6C
+00D5F0  1  D0 DB         bne     LD5C6
+00D5F2  1  E6 6D         inc $6D
+00D5F4  1  B0 D7         bcs     LD5C6
+00D5F6  1               LD5EF:
+00D5F6  1  A5 6C         lda $6C
+00D5F8  1  F0 02         beq     LD5F5
+00D5FA  1  C6 6D         dec $6D
+00D5FC  1               LD5F5:
+00D5FC  1  20 55 D6      jsr     LD64E
+00D5FF  1  18            clc
+00D600  1  A5 6E         lda $6E
+00D602  1  20 3D D6      jsr     LD636
+00D605  1  4C CD D5      jmp     LD5C6
+00D608  1               ;
+00D608  1               LD601:
+00D608  1  20 82 D6      jsr     LD67B
+00D60B  1  20 7F D7      jsr     LD778
+00D60E  1  18            clc
+00D60F  1  65 6D         adc $6D
+00D611  1  85 6D         sta $6D
+00D613  1               LD60C:
+00D613  1  A9 A8         lda     #$A8
+00D615  1  85 59         sta $59
+00D617  1  20 8D D6      jsr BEP_NUL
+00D61A  1  F0 1C         beq     LD631
+00D61C  1  20 B9 D7      jsr     LD7C8
+00D61F  1  A5 6D         lda $6D
+00D621  1  30 0B         bmi     LD627
+00D623  1  F0 10         beq     LD62E
+00D625  1               LD61E:
+00D625  1  20 A7 D6      jsr     LD6A0
+00D628  1  C6 6D         dec $6D
+00D62A  1  D0 F9         bne     LD61E
+00D62C  1  F0 07         beq     LD62E
+00D62E  1               LD627:
+00D62E  1  20 22 D7      jsr     LD71B
+00D631  1  E6 6D         inc $6D
+00D633  1  D0 F9         bne     LD627
+00D635  1               LD62E:
+00D635  1  20 62 DA      jsr     LDA9B
+00D638  1               LD631:
+00D638  1  38            sec
+00D639  1  A4 54         ldy $54
+00D63B  1  88            dey
+00D63C  1               LD635:
+00D63C  1  60            rts
+00D63D  1               ;
+00D63D  1               LD636:
+00D63D  1  A2 05         ldx     #$05
+00D63F  1               LD638:
+00D63F  1  75 59         adc $59,x
+00D641  1  95 59         sta $59,x
+00D643  1  A9 00         lda #$0
+00D645  1  CA            dex
+00D646  1  D0 F7         bne     LD638
+00D648  1  60            rts
+00D649  1               ;
+00D649  1               LD642:
+00D649  1  A2 05         ldx     #$05
+00D64B  1               LD644:
+00D64B  1  B5 59         lda $59,x
+00D64D  1  75 61         adc $61,x
+00D64F  1  95 59         sta $59,x
+00D651  1  CA            dex
+00D652  1  D0 F7         bne     LD644
+00D654  1  60            rts
+00D655  1               ;
+00D655  1               LD64E:
+00D655  1  A2 05         ldx     #$05
+00D657  1  A9 00         lda #$0
+00D659  1  85 67         sta $67
+00D65B  1               LD654:
+00D65B  1  A9 00         lda #$0
+00D65D  1  85 68         sta $68
+00D65F  1  B5 59         lda $59,x
+00D661  1  0A            asl     a
+00D662  1  26 68         rol $68
+00D664  1  0A            asl     a
+00D665  1  26 68         rol $68
+00D667  1  18            clc
+00D668  1  75 59         adc $59,x
+00D66A  1  90 02         bcc     LD667
+00D66C  1  E6 68         inc $68
+00D66E  1               LD667:
+00D66E  1  0A            asl     a
+00D66F  1  26 68         rol $68
+00D671  1  18            clc
+00D672  1  65 67         adc $67
+00D674  1  90 02         bcc     LD671
+00D676  1  E6 68         inc $68
+00D678  1               LD671:
+00D678  1  95 59         sta $59,x
+00D67A  1  A5 68         lda $68
+00D67C  1  85 67         sta $67
+00D67E  1  CA            dex
+00D67F  1  D0 DA         bne     LD654
+00D681  1  60            rts
+00D682  1               ;
+00D682  1               LD67B:
+00D682  1  84 55         sty $55
+00D684  1  A4 54         ldy $54
+00D686  1  B1 52         lda ($52),y
+00D688  1  A4 55         ldy $55
+00D68A  1  E6 54         inc $54
+00D68C  1  60            rts
+00D68D  1               ;
+00D68D  1               BEP_NUL:        ; test op nullen
+00D68D  1  A5 5A        		lda $5A
+00D68F  1  05 5B        		ora $5B
+00D691  1  05 5C        		ora $5C
+00D693  1  05 5D        		ora $5D
+00D695  1  05 5E        		ora $5E
+00D697  1  F0 07        		beq     LD699 ; alles is 0, clear de overige
+00D699  1  A5 57        		lda $57
+00D69B  1  D0 09        		bne     LD69F ; return waarde in A
+00D69D  1  A9 01        		lda     #$01 ; geforceerde 1
+00D69F  1  60           		rts
+00D6A0  1               ;
+00D6A0  1               LD699:       ; store waarde in fp. werkruimte
+00D6A0  1  85 57        		sta $57
+00D6A2  1  85 59        		sta $59
+00D6A4  1  85 58        		sta $58
+00D6A6  1  60           LD69F:  rts
+00D6A7  1               ;
+00D6A7  1               LD6A0:
+00D6A7  1  18            clc
+00D6A8  1  A5 59         lda $59
+00D6AA  1  69 03         adc     #$03
+00D6AC  1  85 59         sta $59
+00D6AE  1  90 02         bcc     LD6AB
+00D6B0  1  E6 58         inc $58
+00D6B2  1               LD6AB:
+00D6B2  1  20 CA D6      jsr     LD6C3
+00D6B5  1  20 02 D7      jsr     LD6FB
+00D6B8  1  20 02 D7      jsr     LD6FB
+00D6BB  1               LD6B4:
+00D6BB  1  20 49 D6      jsr     LD642
+00D6BE  1               LD6B7:
+00D6BE  1  90 09         bcc     LD6C2
+00D6C0  1  20 DF D6      jsr     LD6D8
+00D6C3  1  E6 59         inc $59
+00D6C5  1  D0 02         bne     LD6C2
+00D6C7  1  E6 58         inc $58
+00D6C9  1               LD6C2:
+00D6C9  1  60            rts
+00D6CA  1               ;
+00D6CA  1               ;D6C3 Copy the 8 bytes #57..#5E to #5F..66 subroutine
+00D6CA  1               LD6C3:    ; copy waarde in werkruimte
+00D6CA  1  A2 08        		ldx     #$08
+00D6CC  1  B5 56        LD6C5:	lda $56,x
+00D6CE  1  95 5E        		sta $5E,x
+00D6D0  1  CA           		dex
+00D6D1  1  D0 F9        		bne     LD6C5
+00D6D3  1  60           		rts
+00D6D4  1               ;
+00D6D4  1               ;D6CD Shift Left 1 Bit #5E..#5A subroutine
+00D6D4  1               
+00D6D4  1               LD6CD:    ; * 2 routine
+00D6D4  1  06 5E         asl $5E
+00D6D6  1  26 5D         rol $5D
+00D6D8  1  26 5C         rol $5C
+00D6DA  1  26 5B         rol $5B
+00D6DC  1  26 5A         rol $5A
+00D6DE  1  60            rts
+00D6DF  1               ;
+00D6DF  1               ;D6D8 Shift Right 1 Bit #5A..#5E subroutine
+00D6DF  1               
+00D6DF  1               LD6D8:    ; / 2 routine
+00D6DF  1  66 5A         ror $5A
+00D6E1  1  66 5B         ror $5B
+00D6E3  1  66 5C         ror $5C
+00D6E5  1  66 5D         ror $5D
+00D6E7  1  66 5E         ror $5E
+00D6E9  1  60            rts
+00D6EA  1               ;
+00D6EA  1               ;D6E3 Copy #5A..#5D to #5B..#5E and clear #5A subroutine
+00D6EA  1               
+00D6EA  1  A5 5D         lda $5D       ; schuif de zaak 1 byte op
+00D6EC  1  85 5E         sta $5E
+00D6EE  1  A5 5C         lda $5C
+00D6F0  1  85 5D         sta $5D
+00D6F2  1  A5 5B         lda $5B
+00D6F4  1  85 5C         sta $5C
+00D6F6  1  A5 5A         lda $5A
+00D6F8  1  85 5B         sta $5B
+00D6FA  1  A9 00                lda     #$0         ; en schoon het hoogste byte
+00D6FC  1  85 5A         sta $5A
+00D6FE  1  60            rts
+00D6FF  1               ;
+00D6FF  1               LD6F8:
+00D6FF  1  20 CA D6      jsr     LD6C3
+00D702  1               LD6FB:
+00D702  1  46 62        		lsr 	$62   ; /2 routine
+00D704  1  66 63        		ror 	$63
+00D706  1  66 64        		ror 	$64
+00D708  1  66 65        		ror 	$65
+00D70A  1  66 66        		ror 	$66
+00D70C  1  60           		rts
+00D70D  1               ;
+00D70D  1               ;D706 Copy #62..#65 to #63..#66 and clear #62 subroutine
+00D70D  1               
+00D70D  1  A5 65        		lda 	$65       ; copieer wat bytes
+00D70F  1  85 66        		sta 	$66
+00D711  1  A5 64        		lda 	$64
+00D713  1  85 65        		sta 	$65
+00D715  1  A5 63        		lda 	$63
+00D717  1  85 64        		sta 	$64
+00D719  1  A5 62        		lda 	$62
+00D71B  1  85 63        		sta 	$63
+00D71D  1  A9 00                lda     #$0           ; en schoon de hoogste vriend
+00D71F  1  85 62        		sta 	$62
+00D721  1  60           		rts
+00D722  1               ;
+00D722  1               LD71B:
+00D722  1  38            sec
+00D723  1  A5 59         lda $59
+00D725  1  E9 04         sbc     #$04
+00D727  1  85 59         sta $59
+00D729  1  B0 02         bcs     LD726
+00D72B  1  C6 58         dec $58
+00D72D  1               LD726:
+00D72D  1  20 FF D6     		jsr     LD6F8
+00D730  1  20 BB D6     		jsr     LD6B4
+00D733  1  20 FF D6     		jsr     LD6F8
+00D736  1  20 02 D7     		jsr     LD6FB
+00D739  1  20 02 D7     		jsr     LD6FB
+00D73C  1  20 02 D7     		jsr     LD6FB
+00D73F  1  20 BB D6     		jsr     LD6B4
+00D742  1  A9 00        		lda 	#$0
+00D744  1  85 62        		sta 	$62
+00D746  1  A5 5A        		lda 	$5A
+00D748  1  85 63        		sta 	$63 ; teken rakker?
+00D74A  1  A5 5B         lda 	$5B
+00D74C  1  85 64         sta 	$64
+00D74E  1  A5 5C         lda 	$5C
+00D750  1  85 65         sta 	$65
+00D752  1  A5 5D         lda 	$5D
+00D754  1  85 66         sta 	$66
+00D756  1  A5 5E         lda 	$5E
+00D758  1  2A            rol     a
+00D759  1  20 BB D6      jsr     LD6B4
+00D75C  1               
+00D75C  1  A9 00        		lda #$00 ; deze nog heel nadrukkelijk checken..
+00D75E  1  85 62        		sta $62
+00D760  1  85 63        		sta $63
+00D762  1  A5 5A        		lda $5A
+00D764  1  85 64        		sta $64
+00D766  1  A5 5B        		lda $5B
+00D768  1  85 65        		sta $65
+00D76A  1  A5 5C        		lda $5C
+00D76C  1  85 66        		sta $66
+00D76E  1  A5 5D        		lda $5D
+00D770  1  2A           		rol     a
+00D771  1  20 BB D6     		jsr     LD6B4
+00D774  1  A5 5B         lda $5B
+00D776  1  2A            rol     a
+00D777  1  A5 5A         lda $5A
+00D779  1               LD772:
+00D779  1  20 3D D6      jsr     LD636
+00D77C  1  4C BE D6      jmp     LD6B7
+00D77F  1               ;
+00D77F  1               LD778:
+00D77F  1  A0 FF         ldy     #$FF
+00D781  1  C9 2B         cmp     #$2B
+00D783  1  F0 05         beq     LD783
+00D785  1  C9 2D         cmp     #$2D
+00D787  1  D0 04         bne     LD786
+00D789  1  C8            iny
+00D78A  1               LD783:
+00D78A  1  20 82 D6      jsr     LD67B
+00D78D  1               LD786:
+00D78D  1  20 CA D4      jsr ASC2DEC
+00D790  1  90 24         bcc     LD7AF
+00D792  1  AA            tax
+00D793  1  20 82 D6      jsr     LD67B
+00D796  1  20 CA D4      jsr ASC2DEC
+00D799  1  90 10         bcc     LD7A4
+00D79B  1  85 6E         sta $6E
+00D79D  1  20 82 D6      jsr     LD67B
+00D7A0  1  8A            txa
+00D7A1  1  85 67         sta $67
+00D7A3  1  0A            asl     a
+00D7A4  1  0A            asl     a
+00D7A5  1  65 67         adc $67
+00D7A7  1  0A            asl     a
+00D7A8  1  65 6E         adc $6E
+00D7AA  1  AA            tax
+00D7AB  1               LD7A4:
+00D7AB  1  98            tya
+00D7AC  1  D0 06         bne     LD7AD
+00D7AE  1  86 6E         stx $6E
+00D7B0  1  38            sec
+00D7B1  1  E5 6E         sbc $6E
+00D7B3  1  60            rts
+00D7B4  1               ;
+00D7B4  1               LD7AD:
+00D7B4  1  8A            txa
+00D7B5  1  60            rts
+00D7B6  1               ;
+00D7B6  1               LD7AF:
+00D7B6  1  A9 00         lda #$0
+00D7B8  1               LD7B1:
+00D7B8  1  60            rts
+00D7B9  1               LD7C8:
+00D7B9  1  20 8D D6      jsr BEP_NUL
+00D7BC  1  F0 FA         beq LD7B1
+00D7BE  1               LD7CD:
+00D7BE  1  A5 5A         lda $5A
+00D7C0  1  D0 21         bne LD7F2
+00D7C2  1  A5 5B         lda $5B
+00D7C4  1  85 5A         sta $5A
+00D7C6  1  A5 5C         lda $5C
+00D7C8  1  85 5B         sta $5B
+00D7CA  1  A5 5D         lda $5D
+00D7CC  1  85 5C         sta $5C
+00D7CE  1  A5 5E         lda $5E
+00D7D0  1  85 5D         sta $5D
+00D7D2  1  A9 00         lda #$0
+00D7D4  1  85 5E         sta $5E
+00D7D6  1  38            sec
+00D7D7  1  A5 59         lda $59
+00D7D9  1  E9 08         sbc #$08
+00D7DB  1  85 59         sta $59
+00D7DD  1  B0 DF         bcs LD7CD
+00D7DF  1  C6 58         dec $58
+00D7E1  1  90 DB         bcc LD7CD
+00D7E3  1               LD7F2:
+00D7E3  1  A5 5A         lda $5A
+00D7E5  1  30 D1         bmi LD7B1
+00D7E7  1  20 D4 D6      jsr LD6CD
+00D7EA  1  A5 59         lda $59
+00D7EC  1  D0 02         bne LD7FF
+00D7EE  1  C6 58         dec $58
+00D7F0  1               LD7FF:
+00D7F0  1  C6 59         dec $59
+00D7F2  1  4C E3 D7      jmp LD7F2
+00D7F5  1               LD804:
+00D7F5  1  A0 04         ldy     #$04
+00D7F7  1  A9 00         lda #$0
+00D7F9  1  85 66         sta $66
+00D7FB  1  85 60         sta $60
+00D7FD  1  85 5F         sta $5F
+00D7FF  1               LD80E:
+00D7FF  1  B1 6F         lda ($6F),y
+00D801  1  99 61 00      sta $61,y
+00D804  1  05 5F         ora $5F
+00D806  1  85 5F         sta $5F
+00D808  1  88            dey
+00D809  1  10 F4         bpl     LD80E
+00D80B  1  AA            tax
+00D80C  1  F0 09         beq     LD826
+00D80E  1  A5 62         lda $62
+00D810  1  85 5F         sta $5F
+00D812  1  09 80                ora     #$80
+00D814  1  85 62         sta $62
+00D816  1  8A            txa
+00D817  1               LD826:
+00D817  1  60            rts
+00D818  1               ;
+00D818  1               LD831:
+00D818  1  20 0D DB      jsr LDBAA
+00D81B  1  D0 07         bne LD83D
+00D81D  1               Sla_op:
+00D81D  1  A6 04         ldx $04
+00D81F  1  A0 6F         ldy     #$6F
+00D821  1  20 CD C3      jsr LC3CD    ; zet in basic stack
+00D824  1               LD83D: ; sla tijdelijke gegevens op
+00D824  1  A0 00        		ldy #$0
+00D826  1  A5 59        		lda $59
+00D828  1  91 6F        		sta ($6F),y
+00D82A  1  C8           		iny
+00D82B  1  A5 57        		lda $57
+00D82D  1  29 80        		and     #$80
+00D82F  1  85 57        		sta $57
+00D831  1  A5 5A        		lda $5A
+00D833  1  29 7F        		and     #$7F
+00D835  1  05 57        		ora $57
+00D837  1  91 6F        		sta ($6F),y
+00D839  1  C8           LD852: 	iny
+00D83A  1  B9 59 00     		lda $59,y
+00D83D  1  91 6F        		sta ($6F),y
+00D83F  1  C0 04                cpy     #$04
+00D841  1  D0 F6        		bne     LD852
+00D843  1  60           		rts
+00D844  1               ;
+00D844  1               LD85D:        ; kopier stack naar werkruimte
+00D844  1  A0 52        	ldy     #$52
+00D846  1  84 6F        	sty 	$6F
+00D848  1  A9 00        	lda 	#$0
+00D84A  1  85 70        	sta 	$70
+00D84C  1  20 24 D8     	jsr 	LD83D      ; kopier een deel
+00D84F  1  20 D9 C4     	jsr 	LC4D9      ; basis rom doet de rest
+00D852  1  A5 56        	lda 	$56
+00D854  1  95 73        	sta 	$73,x
+00D856  1  60           	rts
+00D857  1               ;
+00D857  1               LD870:        ; plaats van stack naar werkruimte
+00D857  1  A6 04        	ldx $04
+00D859  1  20 CB C3     	jsr     LC3CB
+00D85C  1  B5 74        	lda 	$74,x
+00D85E  1  85 56        	sta 	$56
+00D860  1  84 6F        	sty 	$6F
+00D862  1  A9 00        	lda 	#$0
+00D864  1  85 70        	sta 	$70
+00D866  1  60           	rts
+00D867  1               ;
+00D867  1               LD880:
+00D867  1  A5 5E         lda $5E
+00D869  1  C9 80         cmp     #$80
+00D86B  1  90 07         bcc     LD88D
+00D86D  1  F0 0A         beq     LD892
+00D86F  1  A9 FF         lda     #$FF
+00D871  1  20 79 D7      jsr     LD772
+00D874  1               LD88D:
+00D874  1  A9 00         lda #$0
+00D876  1  85 5E         sta $5E
+00D878  1  60            rts
+00D879  1               ;
+00D879  1               LD892:
+00D879  1  A5 5D         lda $5D
+00D87B  1  09 01         ora     #$01
+00D87D  1  85 5D         sta $5D
+00D87F  1  D0 F3         bne     LD88D
+00D881  1               LD89A:
+00D881  1  20 AE D8      jsr     LD8C7
+00D884  1  F0 06         beq     LD8A5
+00D886  1               LD89F:
+00D886  1  A5 59         lda $59
+00D888  1  C9 A0         cmp     #$A0
+00D88A  1  B0 14         bcs     LD8B9
+00D88C  1               LD8A5:
+00D88C  1  46 5A         lsr $5A
+00D88E  1  66 5B         ror $5B
+00D890  1  66 5C         ror $5C
+00D892  1  66 5D         ror $5D
+00D894  1  66 62         ror $62
+00D896  1  66 63         ror $63
+00D898  1  66 64         ror $64
+00D89A  1  66 65         ror $65
+00D89C  1  E6 59         inc $59
+00D89E  1  D0 E6         bne     LD89F
+00D8A0  1               LD8B9:
+00D8A0  1  F0 16         beq     LD8D1
+00D8A2  1               LD8BB:
+00D8A2  1  A9 7F         lda     #$7F
+00D8A4  1  85 5A         sta $5A
+00D8A6  1  A9 FF         lda     #$FF
+00D8A8  1  85 5B         sta $5B
+00D8AA  1  85 5C         sta $5C
+00D8AC  1  85 5D         sta $5D
+00D8AE  1               LD8C7:
+00D8AE  1  A2 08         ldx     #$08
+00D8B0  1  A9 00         lda #$0
+00D8B2  1               LD8CB:
+00D8B2  1  95 5F         sta $5F,x
+00D8B4  1  CA            dex
+00D8B5  1  D0 FB         bne     LD8CB
+00D8B7  1  60            rts
+00D8B8  1               ;
+00D8B8  1               LD8D1:
+00D8B8  1  A5 57         lda $57
+00D8BA  1  10 0C         bpl     LD8E1
+00D8BC  1               LD8D5:
+00D8BC  1  38            sec
+00D8BD  1  A2 04         ldx     #$04
+00D8BF  1               LD8D8:
+00D8BF  1  A9 00         lda #$0
+00D8C1  1  F5 59         sbc $59,x
+00D8C3  1  95 59         sta $59,x
+00D8C5  1  CA            dex
+00D8C6  1  D0 F7         bne     LD8D8
+00D8C8  1               LD8E1:
+00D8C8  1  60            rts
+00D8C9  1               ;
+00D8C9  1               LD8E8:
+00D8C9  1  A9 00         lda #$0
+00D8CB  1  F5 61         sbc $61,x
+00D8CD  1  95 61         sta $61,x
+00D8CF  1  CA            dex
+00D8D0  1  D0 F7         bne     LD8E8
+00D8D2  1  A5 57         lda $57
+00D8D4  1  49 80         eor     #$80
+00D8D6  1  85 57         sta $57
+00D8D8  1  10 11         bpl     LD90A
+00D8DA  1               LD8F9:
+00D8DA  1  E6 5D         inc $5D
+00D8DC  1  D0 0C         bne     LD909
+00D8DE  1  E6 5C         inc $5C
+00D8E0  1  D0 08         bne     LD909
+00D8E2  1  E6 5B         inc $5B
+00D8E4  1  D0 04         bne     LD909
+00D8E6  1  E6 5A         inc $5A
+00D8E8  1  F0 B8         beq     LD8BB
+00D8EA  1               LD909:
+00D8EA  1  60            rts
+00D8EB  1               ;
+00D8EB  1               LD90A:
+00D8EB  1  20 BC D8      jsr     LD8D5
+00D8EE  1  20 DA D8      jsr     LD8F9
+00D8F1  1  4C BC D8      jmp     LD8D5
+00D8F4  1               ;
+00D8F4  1               LD913:
+00D8F4  1  A2 05         ldx     #$05
+00D8F6  1               LD915:
+00D8F6  1  B5 61         lda $61,x
+00D8F8  1  95 59         sta $59,x
+00D8FA  1  CA            dex
+00D8FB  1  D0 F9         bne     LD915
+00D8FD  1  A9 80         lda     #$80
+00D8FF  1  85 59         sta $59
+00D901  1  4C B9 D7      jmp     LD7C8
+00D904  1               ;
+00D904  1               LD929:
+00D904  1  A2 08         ldx     #$08
+00D906  1               LD92B:
+00D906  1  B5 5E         lda $5E,x
+00D908  1  95 56         sta $56,x
+00D90A  1  CA            dex
+00D90B  1  D0 F9         bne     LD92B
+00D90D  1               LD932:
+00D90D  1  60            rts
+00D90E  1               ;
+00D90E  1               LD939:
+00D90E  1  20 F5 D1      jsr     LD1BF
+00D911  1  20 F5 D7      jsr LD804
+00D914  1  F0 F7         beq LD932
+00D916  1               LD941:
+00D916  1  20 8D D6      jsr BEP_NUL
+00D919  1  F0 E9         beq     LD929
+00D91B  1  A5 59         lda $59
+00D91D  1  C5 61         cmp $61
+00D91F  1  F0 26         beq     LD972
+00D921  1  90 0F         bcc     LD95D
+00D923  1  E5 61         sbc $61
+00D925  1  C9 21         cmp     #$21
+00D927  1  B0 E4         bcs     LD932
+00D929  1  AA            tax
+00D92A  1               LD955:
+00D92A  1  20 02 D7      jsr     LD6FB
+00D92D  1  CA            dex
+00D92E  1  D0 FA         bne     LD955
+00D930  1  F0 15         beq     LD972
+00D932  1               LD95D:
+00D932  1  38            sec
+00D933  1  A5 61         lda $61
+00D935  1  E5 59         sbc $59
+00D937  1  C9 21         cmp     #$21
+00D939  1  B0 C9         bcs     LD929
+00D93B  1  AA            tax
+00D93C  1               LD967:
+00D93C  1  18            clc
+00D93D  1  20 DF D6      jsr     LD6D8
+00D940  1  CA            dex
+00D941  1  D0 F9         bne     LD967
+00D943  1  A5 61         lda $61
+00D945  1  85 59         sta $59
+00D947  1               LD972:
+00D947  1  A5 57         lda $57
+00D949  1  45 5F         eor $5F
+00D94B  1  10 49         bpl     LD9C1
+00D94D  1  A5 5A         lda $5A
+00D94F  1  C5 62         cmp $62
+00D951  1  D0 1B         bne     LD999
+00D953  1  A5 5B         lda $5B
+00D955  1  C5 63         cmp $63
+00D957  1  D0 15         bne     LD999
+00D959  1  A5 5C         lda $5C
+00D95B  1  C5 64         cmp $64
+00D95D  1  D0 0F         bne     LD999
+00D95F  1  A5 5D         lda $5D
+00D961  1  C5 65         cmp $65
+00D963  1  D0 09         bne     LD999
+00D965  1  A5 5E         lda $5E
+00D967  1  C5 66         cmp $66
+00D969  1  D0 03         bne     LD999
+00D96B  1  4C 6B DA      jmp CLR_WRK
+00D96E  1               ;
+00D96E  1               LD999:
+00D96E  1  B0 2D         bcs     LD9C8
+00D970  1  38            sec
+00D971  1  A5 66         lda $66
+00D973  1  E5 5E         sbc $5E
+00D975  1  85 5E         sta $5E
+00D977  1  A5 65         lda $65
+00D979  1  E5 5D         sbc $5D
+00D97B  1  85 5D         sta $5D
+00D97D  1  A5 64         lda $64
+00D97F  1  E5 5C         sbc $5C
+00D981  1  85 5C         sta $5C
+00D983  1  A5 63         lda $63
+00D985  1  E5 5B         sbc $5B
+00D987  1  85 5B         sta $5B
+00D989  1  A5 62         lda $62
+00D98B  1  E5 5A         sbc $5A
+00D98D  1  85 5A         sta $5A
+00D98F  1  A5 5F         lda $5F
+00D991  1  85 57         sta $57
+00D993  1  4C 5F DA      jmp     LDA98
+00D996  1               ;
+00D996  1               LD9C1:
+00D996  1  18            clc
+00D997  1  20 BB D6      jsr     LD6B4
+00D99A  1  4C 62 DA      jmp     LDA9B
+00D99D  1               ;
+00D99D  1               LD9C8:
+00D99D  1  38            sec
+00D99E  1  A5 5E         lda $5E
+00D9A0  1  E5 66         sbc $66
+00D9A2  1  85 5E         sta $5E
+00D9A4  1  A5 5D         lda $5D
+00D9A6  1  E5 65         sbc $65
+00D9A8  1  85 5D         sta $5D
+00D9AA  1  A5 5C         lda $5C
+00D9AC  1  E5 64         sbc $64
+00D9AE  1  85 5C         sta $5C
+00D9B0  1  A5 5B         lda $5B
+00D9B2  1  E5 63         sbc $63
+00D9B4  1  85 5B         sta $5B
+00D9B6  1  A5 5A         lda $5A
+00D9B8  1  E5 62         sbc $62
+00D9BA  1  85 5A         sta $5A
+00D9BC  1  4C 5F DA      jmp     LDA98
+00D9BF  1               ;
+00D9BF  1  00            brk
+00D9C0  1               LD9EB:
+00D9C0  1  20 FC D0     		jsr     LD0FC
+00D9C3  1  A9 C7        		lda 	#$C7   ; het high adres op de stack voor de latere return
+00D9C5  1  48           		pha
+00D9C6  1  A2 C8        		ldx     #$C8
+00D9C8  1  4C 0B D1     		jmp 	LD10B ; bepaal het argument
+00D9CB  1               ;
+00D9CB  1               EQUAL:
+00D9CB  1  20 0A DA     		jsr  	jsrcomp
+00D9CE  1  A9 5D                lda     #$5D   ; Hier worden bijdehande geintjes uitgehaald
+00D9D0  1  D0 21        		bne  	LDA0C ; het basic adres voor vergelijkingen uit de C000
+00D9D2  1               LEQUAL:
+00D9D2  1  20 0A DA     		jsr  	jsrcomp
+00D9D5  1  A9 66                lda     #$66  ; rom wordt van stal gehaald en het low adres wordt
+00D9D7  1  D0 1A                bne     LDA0C  ; op de stack gezet
+00D9D9  1               NEQUAL:
+00D9D9  1  20 0A DA     		jsr  	jsrcomp
+00D9DC  1  A9 6F                lda     #$6F
+00D9DE  1  D0 13                bne     LDA0C
+00D9E0  1               LT:
+00D9E0  1  20 0A DA     		jsr  	jsrcomp
+00D9E3  1  A9 76                lda     #$76
+00D9E5  1  D0 0C                bne     LDA0C
+00D9E7  1               GEQUAL:
+00D9E7  1  20 0A DA     		jsr  	jsrcomp
+00D9EA  1  A9 7D                lda     #$7D
+00D9EC  1  D0 05                bne     LDA0C
+00D9EE  1               GT:
+00D9EE  1  20 0A DA     		jsr  	jsrcomp
+00D9F1  1  A9 84                lda     #$84
+00D9F3  1               LDA0C:
+00D9F3  1  48                   pha                        ; zet returadres low op de stack
+00D9F4  1  20 FC D0             jsr     LD0FC              ; als alles gelijk is. anders NE
+00D9F7  1  20 7E DB             jsr     naar_pc1           ; tweede argument naar de PC
+00D9FA  1  20 C5 FF             jsr     LFFC5              ; haal byte op. Hierin het resultaat.
+00D9FD  1  29 03        		and  	#$03      ; hoogste 6 bits resetten
+00D9FF  1  85 59        		sta  	$59      ; tijdelijk opslaan
+00DA01  1  08           		php       ; status op stack
+00DA02  1  68           		pla       ; status in accu
+00DA03  1  29 FC        		and  	#$fc      ; bovenste 6 bits bewaren
+00DA05  1  09 3B        		ora  	#59      ; zero en carry erbij schrijven
+00DA07  1  48           		pha       ; en accu via stack
+00DA08  1  28           		plp       ; naar status register
+00DA09  1  60           LDA3C: 	rts       ; en jump naar de basic rom
+00DA0A  1               ;
+00DA0A  1  A9 1C        jsrcomp: lda 	#FPCOMP      ; om de zaak iets in te korten
+00DA0C  1               	;	jmp pc_opdracht1     ; via externe RTS terug naar caller
+00DA0C  1  20 8D D6     LDA45: 	jsr 	BEP_NUL
+00DA0F  1  F0 F8        		beq     LDA3C
+00DA11  1  20 F5 D7     		jsr     LD804
+00DA14  1  D0 03        		bne     LDA52
+00DA16  1  4C 6B DA     		jmp 	CLR_WRK
+00DA19  1               ;
+00DA19  1  18           LDA52: 	clc
+00DA1A  1  A5 59        		lda 	$59
+00DA1C  1  65 61        		adc 	$61
+00DA1E  1  85 59        		sta 	$59
+00DA20  1  90 02        		bcc     LDA5D
+00DA22  1  E6 58        		inc 	$58
+00DA24  1               LDA5D:
+00DA24  1  38           		sec
+00DA25  1  A5 59        		lda 	$59
+00DA27  1  E9 80        		sbc     #$80
+00DA29  1  85 59        		sta 	$59
+00DA2B  1  B0 02        		bcs     LDA68
+00DA2D  1  C6 58        		dec 	$58
+00DA2F  1  A2 05        LDA68: 	ldx     #$05
+00DA31  1  A0 00        		ldy 	#$0
+00DA33  1  B5 59        LDA6C: 	lda 	$59,x
+00DA35  1  95 66        		sta 	$66,x
+00DA37  1  94 59        		sty 	$59,x
+00DA39  1  CA           		dex
+00DA3A  1  D0 F7        		bne     LDA6C
+00DA3C  1  A5 57        		lda 	$57
+00DA3E  1  45 5F        		eor 	$5F
+00DA40  1  85 57        		sta 	$57
+00DA42  1  A0 20        		ldy     #$20
+00DA44  1  20 02 D7     		jsr     LD6FB
+00DA47  1  A5 67        LDA80: 	lda 	$67
+00DA49  1  10 04        		bpl     LDA88
+00DA4B  1  18           		clc
+00DA4C  1  20 49 D6     		jsr     LD642
+00DA4F  1  20 02 D7     LDA88: 	jsr     LD6FB
+00DA52  1  06 6B        		asl 	$6B
+00DA54  1  26 6A        		rol 	$6A
+00DA56  1  26 69        		rol 	$69
+00DA58  1  26 68        		rol 	$68
+00DA5A  1  26 67        		rol 	$67
+00DA5C  1  88           		dey
+00DA5D  1  D0 E8        		bne     LDA80
+00DA5F  1  20 B9 D7     LDA98: 	jsr     LD7C8
+00DA62  1  20 67 D8     LDA9B: 	jsr     LD880
+00DA65  1  A5 58        		lda 	$58
+00DA67  1  F0 0B        		beq     LDAAD
+00DA69  1  10 0A        		bpl     LDAA7
+00DA6B  1  A2 08        CLR_WRK: ldx     #$08
+00DA6D  1               ;
+00DA6D  1  A9 00        		lda #$0
+00DA6F  1               ;
+00DA6F  1  95 56        LDAA8: 	sta 	$56,x
+00DA71  1  CA           		dex
+00DA72  1  D0 FB        		bne     LDAA8
+00DA74  1  60           LDAAD:  rts
+00DA75  1  00           LDAA7:  brk
+00DA76  1               ;
+00DA76  1  20 18 D8     LDAAE: 	jsr     LD831
+00DA79  1  20 80 DB     		jsr     LDE8D
+00DA7C  1               LDAB6:
+00DA7C  1  20 8D D6     		jsr 	BEP_NUL
+00DA7F  1  F0 F4        		beq     LDAA7
+00DA81  1  20 CA D6     		jsr     LD6C3
+00DA84  1  20 1B D2     		jsr 	copy_waarde
+00DA87  1  60           		rts
+00DA88  1               ;
+00DA88  1  20 EB D0     TAN: 	jsr 	BEP_ARG
+00DA8B  1  20 8D D6     		jsr 	BEP_NUL      ; als ie nul is houdt alles op
+00DA8E  1  F0 08        		beq 	tan_exit
+00DA90  1  20 AA DA       		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00DA93  1  A9 08        		lda 	#FPTAN     ; afdeling tangers
+00DA95  1  4C E0 DA     		jmp		procesfpga
+00DA98  1               tan_exit:
+00DA98  1  60           		rts
+00DA99  1               PUTF2:
+00DA99  1  A5 5F        		lda		$5F
+00DA9B  1  49 80        		eor		#$80
+00DA9D  1  85 62        		sta		$62			; eerste argument..
+00DA9F  1  A2 05        		ldx 	#$5      ; op 0
+00DAA1  1  B5 60        LD02:   lda  	$60,x
+00DAA3  1  9D 04 B9     		sta 	$B904,x 	; eerste byte;
+00DAA6  1  CA                   dex
+00DAA7  1  D0 F8                bne     LD02
+00DAA9  1  60                   rts
+00DAAA  1               
+00DAAA  1               ;
+00DAAA  1  A2 05        PUTF:	ldx  #$5      ; op 0 (is het tweede argument..
+00DAAC  1  A5 57        		lda		$57
+00DAAE  1  49 80        		eor		#$80
+00DAB0  1  85 5A        		sta		$5A
+00DAB2  1  B5 58        LD01:   lda     $58,x
+00DAB4  1  9D FF B8     		sta 	$B8ff,x 	; eerste byte;
+00DAB7  1  CA                   dex
+00DAB8  1  D0 F8                bne     LD01
+00DABA  1  60           		rts
+00DABB  1               
+00DABB  1  A0 00        GETF:	ldy  	#$0       ; clear waarde
+00DABD  1  84 5E        		sty  	$5E
+00DABF  1  84 58        		sty  	$58
+00DAC1  1  84 57        		sty  	$57
+00DAC3  1  A0 05        		ldy		#$5
+00DAC5  1  B9 09 B9     LL01:  	lda		$B909,y
+00DAC8  1  99 58 00     		sta  	$58,y   ; sla waarde op
+00DACB  1  05 57        		ora  	$57   	; test op 0
+00DACD  1  85 57        		sta  	$57
+00DACF  1  88           		dey      		; index verhogen we
+00DAD0  1  D0 F3        		bne  	LL01
+00DAD2  1  A6 57        		ldx  	$57
+00DAD4  1  F0 09        		beq  	LLexit
+00DAD6  1  A5 5A        		lda  	$5a
+00DAD8  1  85 57        		sta  	$57
+00DADA  1  09 80                ORA     #$80 ; hier weer teken gedoe??
+00DADC  1  85 5A        		sta  	$5a
+00DADE  1  8A           		txa
+00DADF  1  60           LLexit: rts
+00DAE0  1               
+00DAE0  1               procesfpga:
+00DAE0  1  8D 0F B9     		sta 	$B90F
+00DAE3  1               wachtFPGA:
+00DAE3  1  AD 0F B9     		lda		$B90F	; laadt status van de fpga
+00DAE6  1  30 FB        		bmi		wachtFPGA
+00DAE8  1  EA           		nop		; hier nog iets met de nan status doen..
+00DAE9  1  20 BB DA     		jsr		GETF
+00DAEC  1  60           		rts		; commando is klaar
+00DAED  1               
+00DAED  1  20 EB D0     SQR: 	jsr 	BEP_ARG     ; bepaal waarde argument
+00DAF0  1  20 8D D6     LDB72: 	jsr 	BEP_NUL     ; bepaal waarde argument
+00DAF3  1  F0 0B        		beq 	ENDSQR     ; bij 0 doen we nix
+00DAF5  1  10 01        		bpl 	sqr_verder  ; boven 0 kan wortel bepaald worden
+00DAF7  1  00           		brk      ; daaronder gaan we gillend op ons bek
+00DAF8  1               sqr_verder:
+00DAF8  1               
+00DAF8  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00DAFB  1  A9 07        		lda 	#FPSQRT     ; afdeling wortels
+00DAFD  1  4C E0 DA     		jmp		procesfpga
+00DB00  1  60           ENDSQR:	rts
+00DB01  1               ;
+00DB01  1  A9 D4        LDB9E:  lda     #$D4        ; hier weer een bijdehante waarde
+00DB03  1  D0 0A        		bne     LDBAC
+00DB05  1               LDBA2:
+00DB05  1  A9 CA        		lda     #$CA
+00DB07  1  D0 06        		bne     LDBAC
+00DB09  1               LDBA6:
+00DB09  1  A9 CF        		lda    	#$CF
+00DB0B  1  D0 02        		bne     LDBAC
+00DB0D  1               LDBAA:
+00DB0D  1  A9 C5        		lda     #$C5
+00DB0F  1               LDBAC:
+00DB0F  1  85 6F        		sta 	$6F
+00DB11  1  A9 03        		lda     #$03
+00DB13  1  85 70        		sta 	$70
+00DB15  1  60           		rts
+00DB16  1               ;
+00DB16  1  20 EB D0     LOG: 	jsr 	BEP_ARG
+00DB19  1  20 8D D6     LDBB6:  jsr 	BEP_NUL
+00DB1C  1  F0 02        		beq 	te_klein
+00DB1E  1  10 01        		bpl 	log_verder
+00DB20  1               te_klein:
+00DB20  1  00           		brk
+00DB21  1               log_verder:
+00DB21  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00DB24  1  A9 10        		lda 	#FPLOG     ; afdeling logge rakkers
+00DB26  1  4C E0 DA     		jmp		procesfpga
+00DB29  1               ;		rts
+00DB29  1               ;
+00DB29  1  20 EB D0     ATN: 	jsr 	BEP_ARG
+00DB2C  1  20 8D D6     LDC67: 	jsr 	BEP_NUL
+00DB2F  1  F0 08        		beq 	atn_exit ; bij 0 houdt alles op
+00DB31  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00DB34  1  A9 19        		lda 	#FPATN     ; afdeling wortels
+00DB36  1  4C E0 DA     		jmp		procesfpga
+00DB39  1               atn_exit:
+00DB39  1  60           		rts
+00DB3A  1               ;
+00DB3A  1  20 EB D0     COS: 	JSR 	BEP_ARG
+00DB3D  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00DB40  1  A9 0A        		lda 	#FPCOS     ; afdeling ko en sinas
+00DB42  1  4C E0 DA     		jmp		procesfpga
+00DB45  1               ;
+00DB45  1               ; .org $DBF0 ; EE
+00DB45  1               ;.res 429, $ea
+00DB45  1               
+00DB45  1  20 EB D0     SIN: 	jsr 	BEP_ARG
+00DB48  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00DB4B  1  A9 09        		lda 	#FPSIN     ; afdeling ko en sinas
+00DB4D  1  4C E0 DA     		jmp		procesfpga
+00DB50  1  20 EB D0     EXP: 	jsr 	BEP_ARG
+00DB53  1  A5 59        LDDD7: 	lda 	$59
+00DB55  1  C9 87        		cmp     #$87
+00DB57  1  90 12        		bcc     LDDED
+00DB59  1  D0 06        		bne     LDDE5
+00DB5B  1  A5 5A        		lda $5A
+00DB5D  1  C9 B3        		cmp     #$B3
+00DB5F  1  90 0A        		bcc     LDDED
+00DB61  1  A5 57        LDDE5: 	lda 	$57
+00DB63  1  10 05        		bpl 	L_tegroot
+00DB65  1  30 04        		bmi 	LDDED
+00DB67  1  4C 6B DA     		jmp 	CLR_WRK
+00DB6A  1               ;
+00DB6A  1               L_tegroot:
+00DB6A  1  00           		brk
+00DB6B  1               LDDED:
+00DB6B  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00DB6E  1  A9 12        		lda 	#FPEXP     ; afdeling exponentiele gevallen
+00DB70  1  4C E0 DA     		jmp		procesfpga
+00DB73  1               ;		rts
+00DB73  1               ;
+00DB73  1  20 EB D0     HTN: jsr BEP_ARG     ; bepaal hyperbolische tangens
+00DB76  1  20 AA DA     		jsr		PUTF	; zet de atom waardes klaar voor de fpga
+00DB79  1  A9 0E        		lda 	#FPHTN     ; afdeling exponentiele gevallen
+00DB7B  1  4C E0 DA     		jmp		procesfpga
+00DB7E  1               ;		rts
+00DB7E  1               ;
+00DB7E  1               naar_pc1:
+00DB7E  1  60                   rts
+00DB7F  1               van_pc:
+00DB7F  1  60           		rts
+00DB80  1               LDE8D:
+00DB80  1  20 6B DA     		jsr CLR_WRK
+00DB83  1  A0 80        		ldy     #$80
+00DB85  1  84 5A        		sty 	$5A
+00DB87  1  C8           		iny
+00DB88  1  84 59        		sty 	$59
+00DB8A  1  60           		rts
+00DB8B  1  A9 87        FPINIT: lda 	#$87
+00DB8D  1  20 02 F8     		jsr 	LF802
+00DB90  1  60                   rts
+00DB91  1  4C 5B C5             JMP     LC55B       ; einde init
+00DB94  1                ;.res 255, $ea
+00DB94  1                ;.res 255, $ea
+00DB94  1                ;.res 255, $ea
+00DB94  1  EA EA EA EA   .res 51, $ea
+00DB98  1  EA EA EA EA  
+00DB9C  1  EA EA EA EA  
+00DBC7  1                ;fill $ea,255
+00DBC7  1                ;fill $ea,255
+00DBC7  1                ;fill $ea,51
+00DBC7  1  EA            nop
+00DBC8  1                ; vanaf hier colour routines
+00DBC8  1  A5 52         lda $52
+00DBCA  1  29 03         and     #$03
+00DBCC  1  A8            tay
+00DBCD  1  B9 11 DC      lda XDF4E,y
+00DBD0  1  8D FD 03      sta     $03FD
+00DBD3  1  AD DA 03      lda     $03DA
+00DBD6  1  29 F0         and     #$F0
+00DBD8  1  C9 70         cmp     #$70
+00DBDA  1  D0 0C         bne     LDF25
+00DBDC  1  A9 00         lda #$0
+00DBDE  1  A8            tay
+00DBDF  1               LDF1C:
+00DBDF  1  99 00 86      sta     $8600,y
+00DBE2  1  99 00 87      sta     $8700,y
+00DBE5  1  88            dey
+00DBE6  1  D0 F7         bne     LDF1C
+00DBE8  1               LDF25:
+00DBE8  1  AD DA 03      lda     $03DA
+00DBEB  1  29 DF         and     #$DF
+00DBED  1  8D DA 03      sta     $03DA
+00DBF0  1  2A            rol     a
+00DBF1  1  2A            rol     a
+00DBF2  1  2A            rol     a
+00DBF3  1  29 03         and     #$03
+00DBF5  1  A8            tay
+00DBF6  1  B9 05 DC      lda XDF42,y
+00DBF9  1  8D FE 03      sta     $03FE
+00DBFC  1  B9 09 DC      lda XDF46,y
+00DBFF  1  8D FF 03      sta     $03FF
+00DC02  1  4C 58 C5      jmp LC558
+00DC05  1  15 33 4B 63  XDF42: .byte colo1 .MOD 256, colo2 .MOD 256, colo3 .MOD 256, colo4 .MOD 256
+00DC09  1  DC DC DC DC  XDF46: .byte colo1/256, colo2/256, colo3/256, colo4/256
+00DC0D  1  3F CF F3 FC  XDF4A: .byte $3F, $cf, $f3, $FC
+00DC11  1  00 55 AA FF  XDF4E: .byte $0, $55, $aa, $ff
+00DC15  1  A5 5B        colo1: lda $5B
+00DC17  1  05 5D         ora $5D
+00DC19  1  D0 47         bne TE_GROOT
+00DC1B  1  A5 5A         lda $5A
+00DC1D  1  C9 40         cmp #$40
+00DC1F  1  B0 41         bcs TE_GROOT
+00DC21  1  4A            lsr a
+00DC22  1  4A            lsr a
+00DC23  1  85 5F         sta $5F
+00DC25  1  A0 00         ldy #$0
+00DC27  1  84 60         sty $60
+00DC29  1  A9 3F         lda #$3F
+00DC2B  1  38            sec
+00DC2C  1  E5 5C         sbc $5C
+00DC2E  1  C9 40         cmp     #$40
+00DC30  1  90 4F         bcc     LDFBE
+00DC32  1  60            rts
+00DC33  1               ;
+00DC33  1  A5 5B        colo2: lda $5B
+00DC35  1  05 5D         ora $5D
+00DC37  1  D0 29         bne TE_GROOT
+00DC39  1  A5 5A         lda $5A
+00DC3B  1  30 25         bmi TE_GROOT
+00DC3D  1  4A            lsr     a
+00DC3E  1  4A            lsr     a
+00DC3F  1  85 5F         sta $5F
+00DC41  1  A9 3F         lda     #$3F
+00DC43  1  38            sec
+00DC44  1  E5 5C         sbc $5C
+00DC46  1  C9 40         cmp     #$40
+00DC48  1  90 30         bcc     LDFB7
+00DC4A  1  60            rts
+00DC4B  1               ;
+00DC4B  1  A5 5B        colo3: lda $5B
+00DC4D  1  05 5D         ora $5D
+00DC4F  1  D0 11         bne TE_GROOT
+00DC51  1  A5 5A         lda $5A
+00DC53  1  30 0D         bmi TE_GROOT
+00DC55  1  4A            lsr     a
+00DC56  1  4A            lsr     a
+00DC57  1  85 5F         sta $5F
+00DC59  1  A9 5F         lda     #$5F
+00DC5B  1  38            sec
+00DC5C  1  E5 5C         sbc $5C
+00DC5E  1  C9 60         cmp     #$60
+00DC60  1  90 18         bcc     LDFB7
+00DC62  1               TE_GROOT:
+00DC62  1  60            rts
+00DC63  1               ;
+00DC63  1  A5 5B        colo4: lda $5B
+00DC65  1  05 5D         ora $5D
+00DC67  1  D0 F9         bne TE_GROOT
+00DC69  1  A5 5A         lda $5A
+00DC6B  1  30 F5         bmi TE_GROOT
+00DC6D  1  4A            lsr     a
+00DC6E  1  4A            lsr     a
+00DC6F  1  85 5F         sta $5F
+00DC71  1  A9 BF         lda     #$BF
+00DC73  1  38            sec
+00DC74  1  E5 5C         sbc $5C
+00DC76  1  C9 C0         cmp     #$C0
+00DC78  1  B0 E8         bcs TE_GROOT
+00DC7A  1               LDFB7:
+00DC7A  1  A0 00         ldy #$0
+00DC7C  1  84 60         sty $60
+00DC7E  1  0A            asl     a
+00DC7F  1  26 60         rol $60
+00DC81  1               LDFBE:
+00DC81  1  0A            asl     a
+00DC82  1  26 60         rol $60
+00DC84  1  0A            asl     a
+00DC85  1  26 60         rol $60
+00DC87  1  0A            asl     a
+00DC88  1  26 60         rol $60
+00DC8A  1  0A            asl     a
+00DC8B  1  26 60         rol $60
+00DC8D  1  65 5F         adc $5F
+00DC8F  1  85 5F         sta $5F
+00DC91  1  A5 60         lda $60
+00DC93  1  69 80         adc     #$80
+00DC95  1  85 60         sta $60
+00DC97  1  A5 5A         lda $5A
+00DC99  1  29 03         and     #$03
+00DC9B  1  AA            tax
+00DC9C  1  BD 0D DC      lda XDF4A,x
+00DC9F  1  A6 5E         ldx $5E
+00DCA1  1  CA            dex
+00DCA2  1  F0 0F         beq     LDFF0
+00DCA4  1  CA            dex
+00DCA5  1  F0 05         beq     LDFE9
+00DCA7  1  31 5F         and ($5F),y
+00DCA9  1  91 5F         sta ($5F),y
+00DCAB  1  60            rts
+00DCAC  1               ;
+00DCAC  1               LDFE9:
+00DCAC  1  49 FF         eor     #$FF
+00DCAE  1  51 5F         eor ($5F),y
+00DCB0  1  91 5F         sta ($5F),y
+00DCB2  1  60            rts
+00DCB3  1               ;
+00DCB3  1               LDFF0:
+00DCB3  1  AA            tax
+00DCB4  1  31 5F         and ($5F),y
+00DCB6  1  91 5F         sta ($5F),y
+00DCB8  1  8A            txa
+00DCB9  1  49 FF         eor     #$FF
+00DCBB  1  2D FD 03      and     $03FD
+00DCBE  1  11 5F         ora ($5F),y
+00DCC0  1  91 5F         sta ($5F),y
+00DCC2  1  60            rts
+00DCC3  1               ;
+00DCC3  1               
+00DCC3  1               
